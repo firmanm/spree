@@ -47,7 +47,7 @@ module Spree
     end
 
     def maximum_amount
-      BigDecimal '999999.99'
+      BigDecimal '9999999999.99'
     end
 
     def validate_amount_maximum
