@@ -1,8 +1,11 @@
 module Spree
   class LineItem < Spree::Base
     before_validation :invalid_quantity_check
-    belongs_to :order, class_name: "Spree::Order", inverse_of: :line_items, touch: true
-    belongs_to :variant, class_name: "Spree::Variant", inverse_of: :line_items
+
+    with_options inverse_of: :line_items do
+      belongs_to :order, class_name: "Spree::Order", touch: true
+      belongs_to :variant, class_name: "Spree::Variant"
+    end
     belongs_to :tax_category, class_name: "Spree::TaxCategory"
 
     has_one :product, through: :variant
@@ -22,8 +25,8 @@ module Spree
                         }
     validates :price, numericality: true
     validates_with Stock::AvailabilityValidator
-
     validate :ensure_proper_currency
+
     before_destroy :update_inventory
     before_destroy :destroy_inventory_units
 
@@ -33,7 +36,7 @@ module Spree
     after_create :update_tax_charge
     # after_create :update_adjustment_total
 
-    delegate :name, :description, :sku, :should_track_inventory?, to: :variant
+    delegate :name, :description, :sku, :should_track_inventory?, :product, to: :variant
     delegate :tax_zone, to: :order
 
     attr_accessor :target_shipment
@@ -95,16 +98,6 @@ module Spree
 
     def insufficient_stock?
       !sufficient_stock?
-    end
-
-    # Remove product default_scope `deleted_at: nil`
-    def product
-      variant.product
-    end
-
-    # Remove variant default_scope `deleted_at: nil`
-    def variant
-      Spree::Variant.unscoped { super }
     end
 
     def options=(options = {})

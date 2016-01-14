@@ -203,15 +203,15 @@ describe Spree::Order, :type => :model do
     end
   end
 
-  describe '#ensure_line_item_variants_are_not_deleted' do
-    subject { order.ensure_line_item_variants_are_not_deleted }
+  describe "#ensure_line_item_variants_are_not_discontinued" do
+    subject { order.ensure_line_item_variants_are_not_discontinued }
 
     let(:order) { create :order_with_line_items }
 
     context 'when variant is destroyed' do
       before do
         allow(order).to receive(:restart_checkout_flow)
-        order.line_items.first.variant.destroy
+        order.line_items.first.variant.discontinue!
       end
 
       it 'should restart checkout flow' do
@@ -717,7 +717,7 @@ describe Spree::Order, :type => :model do
       order.completed_at = nil
       expect(order.completed?).to be false
 
-      order.completed_at = Time.now
+      order.completed_at = Time.current
       expect(order.completed?).to be true
     end
   end
@@ -756,14 +756,14 @@ describe Spree::Order, :type => :model do
     it "should be false for completed order in the canceled state" do
       order.state = 'canceled'
       order.shipment_state = 'ready'
-      order.completed_at = Time.now
+      order.completed_at = Time.current
       expect(order.can_cancel?).to be false
     end
 
     it "should be true for completed order with no shipment" do
       order.state = 'complete'
       order.shipment_state = nil
-      order.completed_at = Time.now
+      order.completed_at = Time.current
       expect(order.can_cancel?).to be true
     end
   end

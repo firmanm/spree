@@ -106,10 +106,10 @@ module Spree
                 before_transition from: :delivery, do: :apply_free_shipping_promotions
               end
 
-              before_transition to: :resumed, do: :ensure_line_item_variants_are_not_deleted
+              before_transition to: :resumed, do: :ensure_line_item_variants_are_not_discontinued
               before_transition to: :resumed, do: :ensure_line_items_are_in_stock
 
-              before_transition to: :complete, do: :ensure_line_item_variants_are_not_deleted
+              before_transition to: :complete, do: :ensure_line_item_variants_are_not_discontinued
               before_transition to: :complete, do: :ensure_line_items_are_in_stock
 
               after_transition to: :complete, do: :finalize!
@@ -284,15 +284,12 @@ module Spree
 
           def persist_user_credit_card
             if !temporary_credit_card && user_id && valid_credit_cards.present?
-              default_cc = valid_credit_cards.first
-              default_cc.user_id = user_id
-              default_cc.default = true
-              default_cc.save
+              valid_credit_cards.first.update(user_id: user_id, default: true)
             end
           end
 
           def assign_default_credit_card
-            if payments.from_credit_card.count == 0 && user_has_valid_default_card? && payment_required?
+            if payments.from_credit_card.size == 0 && user_has_valid_default_card? && payment_required?
               cc = user.default_credit_card
               payments.create!(payment_method_id: cc.payment_method_id, source: cc, amount: total)
             end

@@ -7,14 +7,17 @@ module Spree
     extend FriendlyId
     friendly_id :number, slug_column: :number, use: :slugged
 
-
-    belongs_to :address, class_name: 'Spree::Address', inverse_of: :shipments
-    belongs_to :order, class_name: 'Spree::Order', touch: true, inverse_of: :shipments
+    with_options inverse_of: :shipments do
+      belongs_to :address, class_name: 'Spree::Address'
+      belongs_to :order, class_name: 'Spree::Order', touch: true
+    end
     belongs_to :stock_location, class_name: 'Spree::StockLocation'
 
-    has_many :adjustments, as: :adjustable, dependent: :delete_all
-    has_many :inventory_units, dependent: :delete_all, inverse_of: :shipment
-    has_many :shipping_rates, -> { order('cost ASC') }, dependent: :delete_all
+    with_options dependent: :delete_all do
+      has_many :adjustments, as: :adjustable
+      has_many :inventory_units, inverse_of: :shipment
+      has_many :shipping_rates, -> { order(:cost) }
+    end
     has_many :shipping_methods, through: :shipping_rates
     has_many :state_changes, as: :stateful
 
@@ -135,7 +138,7 @@ module Spree
 
     def finalize!
       InventoryUnit.finalize_units!(inventory_units)
-      manifest.each { |item| manifest_unstock(item) }
+      after_resume
     end
 
     def include?(variant)
@@ -167,7 +170,7 @@ module Spree
         units.group_by(&:line_item_id).map do |line_item_id, units|
 
           states = {}
-          units.group_by(&:state).each { |state, iu| states[state] = iu.count }
+          units.group_by(&:state).each { |state, iu| states[state] = iu.size }
 
           line_item = units.first.line_item
           variant = units.first.variant
@@ -251,7 +254,7 @@ module Spree
 
     def shipped=(value)
       return unless value == '1' && shipped_at.nil?
-      self.shipped_at = Time.now
+      self.shipped_at = Time.current
     end
 
     def shipping_method
@@ -286,7 +289,7 @@ module Spree
         self.update_columns(
           cost: selected_shipping_rate.cost,
           adjustment_total: adjustments.additional.map(&:update!).compact.sum,
-          updated_at: Time.now,
+          updated_at: Time.current,
         )
       end
     end
@@ -308,7 +311,7 @@ module Spree
           # (via Order#paid?) affects the shipment state (YAY)
           self.update_columns(
             state: determine_state(order),
-            updated_at: Time.now
+            updated_at: Time.current
           )
 
           # And then it's time to update shipment states and finally persist
@@ -329,7 +332,7 @@ module Spree
       new_state = determine_state(order)
       update_columns(
         state: new_state,
-        updated_at: Time.now,
+        updated_at: Time.current,
       )
       after_ship if new_state == 'shipped' and old_state != 'shipped'
     end
