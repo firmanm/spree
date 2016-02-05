@@ -5,7 +5,12 @@ module Spree
     belongs_to :address, class_name: 'Spree::Address', inverse_of: :shipments
     belongs_to :order, class_name: 'Spree::Order', touch: true, inverse_of: :shipments
     belongs_to :stock_location, class_name: 'Spree::StockLocation'
+    belongs_to :order, class_name: 'Spree::Order', touch: true, inverse_of: :shipments
 
+    has_many :payments, as: :payable
+    has_attached_file :receipt_img, dependent: :destroy
+    validates_attachment :receipt_img, :content_type => { :content_type => /\Aimage\/.*\Z/ }, :size => { :in => 0..500.kilobytes }
+  
     has_many :adjustments, as: :adjustable, dependent: :delete_all
     has_many :inventory_units, dependent: :delete_all, inverse_of: :shipment
     has_many :shipping_rates, -> { order('cost ASC') }, dependent: :delete_all
@@ -16,6 +21,8 @@ module Spree
 
     before_validation :set_cost_zero_when_nil
 
+    delegate :merchant, to: :stock_location
+    
     validates :stock_location, presence: true
 
     attr_accessor :special_instructions
@@ -32,6 +39,7 @@ module Spree
     scope :with_state, ->(*s) { where(state: s) }
     # sort by most recent shipped_at, falling back to created_at. add "id desc" to make specs that involve this scope more deterministic.
     scope :reverse_chronological, -> { order('coalesce(spree_shipments.shipped_at, spree_shipments.created_at) desc', id: :desc) }
+    scope :by_merchant, -> (merchant_id) { joins(:stock_location).where(spree_stock_locations: { merchant_id: merchant_id }) }
 
     # shipment state machine (see http://github.com/pluginaweek/state_machine/tree/master for details)
     state_machine initial: :pending, use_transactions: false do
@@ -78,6 +86,18 @@ module Spree
 
     self.whitelisted_ransackable_attributes = ['number']
 
+    def completed_payment
+      self.order.payments.where(:state => 'completed').first
+    end
+
+    def display_final_price_with_items
+    Spree::Money.new final_price_with_items
+    end
+
+    def final_price_with_items
+      self.item_cost + self.final_price
+    end
+    
     def add_shipping_method(shipping_method, selected = false)
       shipping_rates.create(shipping_method: shipping_method, selected: selected, cost: cost)
     end
