@@ -9,7 +9,7 @@ module Spree
 
     has_many :payments, as: :payable
     has_attached_file :receipt_img, dependent: :destroy
-    validates_attachment :receipt_img, :content_type => { :content_type => /\Aimage\/.*\Z/ }, :size => { :in => 0..500.kilobytes }
+    validates_attachment :receipt_img, :content_type => { :content_type => /\Aimage\/.*\Z/ }, :size => { :in => 0..5000.kilobytes }
   
     has_many :adjustments, as: :adjustable, dependent: :delete_all
     has_many :inventory_units, dependent: :delete_all, inverse_of: :shipment
