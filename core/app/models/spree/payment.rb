@@ -20,7 +20,7 @@ module Spree
     attr_accessor :validate_bank_details
 
     has_attached_file :receipt_img, dependent: :destroy
-    validates_attachment :receipt_img, :content_type => { :content_type => /\Aimage\/.*\Z/ }, :size => { :in => 0..2.megabytes }
+    validates_attachment :receipt_img, :content_type => { :content_type => /\Aimage\/.*\Z/ }, :size => { :in => 0..5.megabytes }
 
     validates :bank_name, :account_name, :account_no, :deposited_on, :presence => true, :if => :validate_bank_details
     validates :bank_name, :length => { :minimum => 3, :too_short => "must have at least %{count} words"}, :if => :validate_bank_details
