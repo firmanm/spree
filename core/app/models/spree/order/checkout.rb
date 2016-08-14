@@ -38,8 +38,6 @@ module Spree
 
             klass = self
 
-            # To avoid a ton of warnings when the state machine is re-defined
-            StateMachines::Machine.ignore_method_conflicts = true
             # To avoid multiple occurrences of the same transition being defined
             # On first definition, state_machines will not be defined
             state_machines.clear if respond_to?(:state_machines)
@@ -76,6 +74,9 @@ module Spree
                 transition to: :awaiting_return
               end
 
+              before_transition to: :complete, do: :ensure_line_item_variants_are_not_discontinued
+              before_transition to: :complete, do: :ensure_line_items_are_in_stock
+
               if states[:payment]
                 before_transition to: :complete do |order|
                   if order.payment_required? && order.payments.valid.empty?
@@ -108,9 +109,6 @@ module Spree
 
               before_transition to: :resumed, do: :ensure_line_item_variants_are_not_discontinued
               before_transition to: :resumed, do: :ensure_line_items_are_in_stock
-
-              before_transition to: :complete, do: :ensure_line_item_variants_are_not_discontinued
-              before_transition to: :complete, do: :ensure_line_items_are_in_stock
 
               after_transition to: :complete, do: :finalize!
               after_transition to: :resumed, do: :after_resume
@@ -328,7 +326,7 @@ module Spree
             if @updating_params[:order] && (@updating_params[:order][:payments_attributes] ||
                                             @updating_params[:order][:existing_card])
               @updating_params[:order][:payments_attributes] ||= [{}]
-              @updating_params[:order][:payments_attributes].first[:amount] = total
+              @updating_params[:order][:payments_attributes].first[:amount] = order_total_after_store_credit
             end
           end
         end

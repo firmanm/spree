@@ -3,9 +3,10 @@ module Spree
     module ControllerHelpers
       module Auth
         extend ActiveSupport::Concern
+        include Spree::Core::TokenGenerator
 
         included do
-          before_filter :set_guest_token
+          before_action :set_guest_token
           helper_method :try_spree_current_user
 
           rescue_from CanCan::AccessDenied do |exception|
@@ -24,8 +25,8 @@ module Spree
         end
 
         def set_guest_token
-          unless cookies.signed[:guest_token].present?
-            cookies.permanent.signed[:guest_token] = SecureRandom.urlsafe_base64(nil, false)
+          if cookies.signed[:guest_token].blank?
+            cookies.permanent.signed[:guest_token] = generate_guest_token
           end
         end
 
@@ -66,7 +67,7 @@ module Spree
         def redirect_unauthorized_access
           if try_spree_current_user
             flash[:error] = Spree.t(:authorization_failure)
-            redirect_to '/unauthorized'
+            redirect_to spree.forbidden_path
           else
             store_location
             if respond_to?(:spree_login_path)

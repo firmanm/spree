@@ -27,7 +27,8 @@ module Spree
 
     before_save :normalize_blank_values
 
-    scope :coupons, ->{ where("#{table_name}.code IS NOT NULL") }
+    scope :coupons, -> { where.not(code: nil) }
+    scope :advertised, -> { where(advertise: true) }
     scope :applied, lambda {
       joins(<<-SQL).uniq
         INNER JOIN spree_order_promotions
@@ -36,10 +37,6 @@ module Spree
     }
 
     self.whitelisted_ransackable_attributes = ['path', 'promotion_category_id', 'code']
-
-    def self.advertised
-      where(advertise: true)
-    end
 
     def self.with_coupon_code(coupon_code)
       where("lower(#{table_name}.code) = ?", coupon_code.strip.downcase).first
@@ -83,7 +80,7 @@ module Spree
       action_taken
     end
 
-    # called anytime order.update! happens
+    # called anytime order.update_with_updater! happens
     def eligible?(promotable)
       return false if expired? || usage_limit_exceeded?(promotable) || blacklisted?(promotable)
       !!eligible_rules(promotable, {})

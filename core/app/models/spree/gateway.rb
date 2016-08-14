@@ -4,18 +4,13 @@ module Spree
 
     delegate :authorize, :purchase, :capture, :void, :credit, to: :provider
 
-    validates :name, :type, presence: true
+    validates :type, presence: true
 
     preference :server, :string, default: 'test'
     preference :test_mode, :boolean, default: true
 
     def payment_source_class
       CreditCard
-    end
-
-    # instantiates the selected gateway and configures with the options stored in the database
-    def self.current
-      super
     end
 
     def provider

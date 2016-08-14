@@ -17,9 +17,9 @@ module Spree
       has_many :adjustments, as: :adjustable
       has_many :inventory_units, inverse_of: :shipment
       has_many :shipping_rates, -> { order(:cost) }
+      has_many :state_changes, as: :stateful
     end
     has_many :shipping_methods, through: :shipping_rates
-    has_many :state_changes, as: :stateful
 
     after_save :update_adjustments
 
@@ -115,7 +115,7 @@ module Spree
       return 'canceled' if order.canceled?
       return 'pending' unless order.can_ship?
       return 'pending' if inventory_units.any? &:backordered?
-      return 'shipped' if state == 'shipped'
+      return 'shipped' if shipped?
       order.paid? || Spree::Config[:auto_capture_on_dispatch] ? 'ready' : 'pending'
     end
 

@@ -16,6 +16,12 @@ module Spree
     context "as an admin" do
       sign_in_as_admin!
 
+      it "can learn how to create a new image" do
+        api_get :new, product_id: product.id
+        expect(json_response["attributes"]).to eq(attributes.map(&:to_s))
+        expect(json_response["required_attributes"]).to be_empty
+      end
+
       it "can upload a new image for a variant" do
         expect do
           api_post :create,
@@ -26,6 +32,15 @@ module Spree
           expect(response.status).to eq(201)
           expect(json_response).to have_attributes(attributes)
         end.to change(Image, :count).by(1)
+      end
+
+      it "can't upload a new image for a variant without attachment" do
+        api_post :create,
+                 image: { viewable_type: 'Spree::Variant',
+                          viewable_id: product.master.to_param
+                        },
+                 product_id: product.id
+        expect(response.status).to eq(422)
       end
 
       context "working with an existing image" do
@@ -63,6 +78,13 @@ module Spree
           expect(response.status).to eq(200)
           expect(json_response).to have_attributes(attributes)
           expect(product_image.reload.position).to eq(2)
+        end
+
+        it "can't update a image without attachment" do
+          api_post :update,
+                   image: { attachment: nil },
+                   id: product_image.id, product_id: product.id
+          expect(response.status).to eq(422)
         end
 
         it "can delete an image" do

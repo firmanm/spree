@@ -9,6 +9,7 @@ module Spree
 
     NON_RISKY_AVS_CODES = ['B', 'D', 'H', 'J', 'M', 'Q', 'T', 'V', 'X', 'Y'].freeze
     RISKY_AVS_CODES     = ['A', 'C', 'E', 'F', 'G', 'I', 'K', 'L', 'N', 'O', 'P', 'R', 'S', 'U', 'W', 'Z'].freeze
+    INVALID_STATES      = %w(failed invalid).freeze
 
     with_options inverse_of: :payments do
       belongs_to :order, class_name: 'Spree::Order', touch: true
@@ -32,6 +33,7 @@ module Spree
 
     # invalidate previously entered payments
     after_create :invalidate_old_payments
+    after_create :create_eligible_credit_event
 
     attr_accessor :source_attributes, :request_env
 
@@ -39,6 +41,7 @@ module Spree
 
     validates :amount, numericality: true
 
+    delegate :store_credit?, to: :payment_method, allow_nil: true
     default_scope { order(:created_at) }
 
     scope :from_credit_card, -> { where(source_type: 'Spree::CreditCard') }
@@ -53,12 +56,17 @@ module Spree
     scope :failed, -> { with_state('failed') }
 
     scope :risky, -> { where("avs_response IN (?) OR (cvv_response_code IS NOT NULL and cvv_response_code != 'M') OR state = 'failed'", RISKY_AVS_CODES) }
-    scope :valid, -> { where.not(state: %w(failed invalid)) }
+    scope :valid, -> { where.not(state: INVALID_STATES) }
+
+    scope :store_credits, -> { where(source_type: Spree::StoreCredit.to_s) }
+    scope :not_store_credits, -> { where(arel_table[:source_type].not_eq(Spree::StoreCredit.to_s).or(arel_table[:source_type].eq(nil))) }
 
     # transaction_id is much easier to understand
     def transaction_id
       response_code
     end
+
+    delegate :currency, to: :order
 
     # order state machine (see http://github.com/pluginaweek/state_machine/tree/master for details)
     state_machine initial: :checkout do
@@ -97,10 +105,6 @@ module Spree
           name:           'payment',
         )
       end
-    end
-
-    def currency
-      order.currency
     end
 
     def money
@@ -176,6 +180,10 @@ module Spree
 
     private
 
+    def has_invalid_state?
+      INVALID_STATES.include?(state)
+    end
+
       def validate_source
         if source && !source.valid?
           source.errors.each do |field, error|
@@ -192,7 +200,7 @@ module Spree
 
       def create_payment_profile
         # Don't attempt to create on bad payments.
-        return if %w(invalid failed).include?(state)
+        return if has_invalid_state?
         # Payment profile cannot be created without source
         return unless source
         # Imported payments shouldn't create a payment profile.
@@ -204,7 +212,7 @@ module Spree
       end
 
       def invalidate_old_payments
-        if state != 'invalid' and state != 'failed'
+        unless has_invalid_state?
           order.payments.with_state('checkout').where("id != ?", self.id).each do |payment|
             payment.invalidate!
           end
@@ -238,6 +246,29 @@ module Spree
 
         if self.completed? || order.completed?
           order.persist_totals
+        end
+      end
+
+      def create_eligible_credit_event
+        # When cancelling an order, a payment with the negative amount
+        # of the payment total is created to refund the customer. That
+        # payment has a source of itself (Spree::Payment) no matter the
+        # type of payment getting refunded, hence the additional check
+        # if the source is a store credit.
+        return unless store_credit? && source.is_a?(Spree::StoreCredit)
+
+        # creates the store credit event
+        source.update_attributes!({
+          action: Spree::StoreCredit::ELIGIBLE_ACTION,
+          action_amount: amount,
+          action_authorization_code: response_code,
+        })
+      end
+
+      def invalidate_old_payments
+        return if store_credit? # store credits shouldn't invalidate other payment types
+        order.payments.with_state('checkout').where("id != ?", self.id).each do |payment|
+          payment.invalidate! unless payment.store_credit?
         end
       end
 

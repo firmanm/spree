@@ -15,6 +15,37 @@ describe Spree::Order, :type => :model do
     allow(Spree::LegacyUser).to receive_messages(:current => mock_model(Spree::LegacyUser, :id => 123))
   end
 
+  describe '.scopes' do
+    let!(:user) { FactoryGirl.create(:user) }
+    let!(:completed_order) { FactoryGirl.create(:order, user: user, completed_at: Time.current) }
+    let!(:incompleted_order) { FactoryGirl.create(:order, user: user, completed_at: nil) }
+
+    describe '.complete' do
+      it { expect(Spree::Order.complete).to include completed_order }
+      it { expect(Spree::Order.complete).not_to include incompleted_order }
+    end
+
+    describe '.incomplete' do
+      it { expect(Spree::Order.incomplete).to include incompleted_order }
+      it { expect(Spree::Order.incomplete).not_to include completed_order }
+    end
+  end
+
+  describe '#update_with_updater!' do
+    let(:updater) { Spree::OrderUpdater.new(order) }
+
+    before do
+      allow(order).to receive(:updater).and_return(updater)
+      allow(updater).to receive(:update).and_return(true)
+    end
+
+    after { order.update_with_updater! }
+
+    it 'expects to update order with order updater' do
+      expect(updater).to receive(:update).and_return(true)
+    end
+  end
+
   context "#cancel" do
     let(:order) { create(:completed_order_with_totals) }
     let!(:payment) do
@@ -67,15 +98,15 @@ describe Spree::Order, :type => :model do
     end
   end
 
-  context "#create" do
+  context '#create' do
     let(:order) { Spree::Order.create }
 
-    it "should assign an order number" do
+    it 'should assign an order number' do
       expect(order.number).not_to be_nil
     end
 
-    it 'should create a randomized 22 character token' do
-      expect(order.guest_token.size).to eq(22)
+    it 'should create a randomized 35 character token' do
+      expect(order.guest_token.size).to eq(35)
     end
   end
 
@@ -157,9 +188,6 @@ describe Spree::Order, :type => :model do
     end
 
     it "should freeze all adjustments" do
-      # Stub this method as it's called due to a callback
-      # and it's irrelevant to this test
-      allow(order).to receive :has_available_shipment
       allow(Spree::OrderMailer).to receive_message_chain :confirm_email, :deliver_later
       adjustments = [double]
       expect(order).to receive(:all_adjustments).and_return(adjustments)
@@ -210,7 +238,6 @@ describe Spree::Order, :type => :model do
 
     context 'when variant is destroyed' do
       before do
-        allow(order).to receive(:restart_checkout_flow)
         order.line_items.first.variant.discontinue!
       end
 
@@ -221,7 +248,7 @@ describe Spree::Order, :type => :model do
 
       it 'should have error message' do
         subject
-        expect(order.errors[:base]).to include(Spree.t(:deleted_variants_present))
+        expect(order.errors[:base]).to include(Spree.t(:discontinued_variants_present))
       end
 
       it 'should be false' do
@@ -244,14 +271,14 @@ describe Spree::Order, :type => :model do
   describe '#ensure_line_items_are_in_stock' do
     subject { order.ensure_line_items_are_in_stock }
 
-    let(:line_item) { mock_model Spree::LineItem, :insufficient_stock? => true }
+    let(:line_item) { create(:line_item, order: order) }
 
     before do
-      allow(order).to receive(:restart_checkout_flow)
-      allow(order).to receive_messages(:line_items => [line_item])
+      allow(order).to receive(:insufficient_stock_lines).and_return([true])
     end
 
     it 'should restart checkout flow' do
+      allow(order).to receive(:restart_checkout_flow)
       expect(order).to receive(:restart_checkout_flow).once
       subject
     end
@@ -262,28 +289,43 @@ describe Spree::Order, :type => :model do
     end
 
     it 'should be false' do
+      allow(order).to receive(:restart_checkout_flow)
       expect(subject).to be_falsey
     end
   end
 
   context "empty!" do
-    let(:order) { stub_model(Spree::Order, item_count: 2) }
+    let(:order) { Spree::Order.create(email: 'test@example.com') }
+    let(:promotion) { create :promotion, code: '10off' }
 
     before do
-      allow(order).to receive_messages(line_items: [1, 2])
-      allow(order).to receive_messages(adjustments: [])
-      allow(order).to receive_message_chain(:line_items, sum: 0)
+      promotion.orders << order
     end
 
-    it "clears out line items, adjustments and update totals" do
-      expect(order.line_items).to receive(:destroy_all)
-      expect(order.adjustments).to receive(:destroy_all)
-      expect(order.shipments).to receive(:destroy_all)
-      expect(order.updater).to receive(:update_totals)
-      expect(order.updater).to receive(:persist_totals)
+    context 'completed order' do
+      before do
+        order.update_columns(state: 'complete', completed_at: Time.current)
+      end
 
-      order.empty!
-      expect(order.item_total).to eq 0
+      it "raises an exception" do
+        expect { order.empty! }.to raise_error(RuntimeError, Spree.t(:cannot_empty_completed_order))
+      end
+    end
+
+    context 'incomplete order' do
+      before do
+        order.empty!
+      end
+
+      it "clears out line items, adjustments and update totals" do
+        expect(order.line_items.count).to be_zero
+        expect(order.adjustments.count).to be_zero
+        expect(order.shipments.count).to be_zero
+        expect(order.order_promotions.count).to be_zero
+        expect(order.promo_total).to be_zero
+        expect(order.item_total).to be_zero
+        expect(order.empty!).to eq(order)
+      end
     end
   end
 
@@ -392,7 +434,7 @@ describe Spree::Order, :type => :model do
     it "calls hook during update" do
       order = create(:order)
       expect(order).to receive(:add_awesome_sauce)
-      order.update!
+      order.update_with_updater!
     end
 
     it "calls hook during finalize" do

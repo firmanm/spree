@@ -26,34 +26,55 @@ describe Spree::Promotion, :type => :model do
     end
   end
 
-  describe ".coupons" do
-    it "scopes promotions with coupon code present only" do
-      promotion = Spree::Promotion.create! name: "test", code: ''
-      expect(Spree::Promotion.coupons).to be_empty
+  describe 'scopes' do
+    describe '.coupons' do
+      let!(:promotion_without_code) { Spree::Promotion.create! name: 'test', code: '' }
+      let!(:promotion_with_code) { Spree::Promotion.create! name: 'test1', code: 'code' }
 
-      promotion.update_column :code, "check"
-      expect(Spree::Promotion.coupons.first).to eq promotion
+      subject { Spree::Promotion.coupons }
+
+      it 'is expected to not include promotion without code' do
+        is_expected.to_not include(promotion_without_code)
+      end
+
+      it 'is expected to include promotion with code' do
+        is_expected.to include(promotion_with_code)
+      end
     end
-  end
 
-  describe ".applied" do
-    it "scopes promotions that have been applied to an order only" do
-      promotion = Spree::Promotion.create! name: "test", code: ''
-      expect(Spree::Promotion.applied).to be_empty
+    describe '.applied' do
+      let!(:promotion_not_applied) { Spree::Promotion.create! name: 'test', code: '' }
+      let(:order) { create(:order) }
+      let!(:promotion_applied) do
+        promotion = Spree::Promotion.create!(name: 'test1', code: '')
+        promotion.orders << order
+        promotion
+      end
 
-      promotion.orders << create(:order)
-      expect(Spree::Promotion.applied.first).to eq promotion
+      subject { Spree::Promotion.applied }
+
+      it 'is expected to not include promotion not applied' do
+        is_expected.to_not include(promotion_not_applied)
+      end
+
+      it 'is expected to include promotion applied' do
+        is_expected.to include(promotion_applied)
+      end
     end
-  end
 
-  describe ".advertised" do
-    let(:promotion) { create(:promotion) }
-    let(:advertised_promotion) { create(:promotion, :advertise => true) }
+    describe '.advertised' do
+      let!(:promotion_not_advertised) { Spree::Promotion.create! name: 'test', advertise: false }
+      let!(:promotion_advertised) { Spree::Promotion.create! name: 'test1', advertise: true }
 
-    it "only shows advertised promotions" do
-      advertised = Spree::Promotion.advertised
-      expect(advertised).to include(advertised_promotion)
-      expect(advertised).not_to include(promotion)
+      subject { Spree::Promotion.advertised }
+
+      it 'is expected to not include promotion not advertised' do
+        is_expected.to_not include(promotion_not_advertised)
+      end
+
+      it 'is expected to include promotion advertised' do
+        is_expected.to include(promotion_advertised)
+      end
     end
   end
 
@@ -297,15 +318,15 @@ describe Spree::Promotion, :type => :model do
   end
 
   context "#products" do
+    let(:product) { create(:product) }
     let(:promotion) { create(:promotion) }
 
     context "when it has product rules with products associated" do
-      let(:promotion_rule) { Spree::Promotion::Rules::Product.new }
+      let(:promotion_rule) { create(:promotion_rule, promotion: promotion, type: 'Spree::Promotion::Rules::Product') }
 
       before do
-        promotion_rule.promotion = promotion
-        promotion_rule.products << create(:product)
-        promotion_rule.save
+        promotion.promotion_rules << promotion_rule
+        product.product_promotion_rules.create(promotion_rule_id: promotion_rule.id)
       end
 
       it "should have products" do
@@ -541,7 +562,7 @@ describe Spree::Promotion, :type => :model do
     context 'when the user has used this promo' do
       before do
         promotion.activate(order: order)
-        order.update!
+        order.update_with_updater!
         order.completed_at = Time.current
         order.save!
       end
@@ -588,7 +609,7 @@ describe Spree::Promotion, :type => :model do
       expect(order.adjustment_total).to eq 0
 
       promo.activate order: order
-      order.update!
+      order.update_with_updater!
 
       expect(line_item.adjustments.size).to eq(1)
       expect(order.adjustment_total).to eq -5

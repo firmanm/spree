@@ -12,12 +12,12 @@ module Spree
         if @variant.destroy
           flash[:success] = Spree.t('notice_messages.variant_deleted')
         else
-          flash[:success] = Spree.t('notice_messages.variant_not_deleted')
+          flash[:error] = Spree.t('notice_messages.variant_not_deleted')
         end
 
         respond_with(@variant) do |format|
           format.html { redirect_to admin_product_variants_url(params[:product_id]) }
-          format.js  { render_js_for_destroy }
+          format.js { render_js_for_destroy }
         end
       end
 
@@ -26,8 +26,10 @@ module Spree
           master = @object.product.master
           @object.attributes = master.attributes.except('id', 'created_at', 'deleted_at',
                                                                         'sku', 'is_master')
-          # Shallow Clone of the default price to populate the price field.
-          @object.default_price = master.default_price.clone
+          if master.default_price.present?
+            # Shallow Clone of the default price to populate the price field.
+            @object.default_price = master.default_price.clone
+          end
         end
 
         def collection

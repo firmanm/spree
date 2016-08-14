@@ -33,7 +33,8 @@ input.form-control {
       color: $brand-danger
     }
 
-    input {
+    input,
+    .select2-choice {
       border-color: $brand-danger;
     }
   }
@@ -51,4 +52,8 @@ input.form-control {
 
 .checkbox > .help-block {
   margin-top: 0;
+}
+
+.display-inline {
+  display: inline;
 }

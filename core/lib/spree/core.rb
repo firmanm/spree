@@ -15,6 +15,10 @@ require 'ransack'
 require 'responders'
 require 'state_machines-activerecord'
 
+# This is required because ActiveModel::Validations#invalid? conflicts with the
+# invalid state of a Payment. In the future this should be removed.
+StateMachines::Machine.ignore_method_conflicts = true
+
 module Spree
 
   mattr_accessor :user_class
@@ -27,8 +31,20 @@ module Spree
     end
   end
 
-  mattr_accessor :admin_path
-  @@admin_path = "/admin"
+  def self.admin_path
+    Spree::Config[:admin_path]
+  end
+
+  # Used to configure admin_path for Spree
+  #
+  # Example:
+  #
+  # write the following line in `config/initializers/spree.rb`
+  #   Spree.admin_path = '/custom-path'
+
+  def self.admin_path=(path)
+    Spree::Config[:admin_path] = path
+  end
 
   # Used to configure Spree.
   #
@@ -46,6 +62,7 @@ module Spree
 
   module Core
     autoload :ProductFilters, "spree/core/product_filters"
+    autoload :TokenGenerator, "spree/core/token_generator"
 
     class GatewayError < RuntimeError; end
     class DestroyWithOrdersError < StandardError; end

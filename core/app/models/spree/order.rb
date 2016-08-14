@@ -3,8 +3,8 @@ require 'spree/order/checkout'
 
 module Spree
   class Order < Spree::Base
-    PAYMENT_STATES = %w(balance_due checkout completed credit_owed failed paid pending processing void).freeze
-    SHIPMENT_STATES = %w(backorder canceled partial pending ready shipped).freeze
+    PAYMENT_STATES = %w(balance_due credit_owed failed paid void)
+    SHIPMENT_STATES = %w(backorder canceled partial pending ready shipped)
 
     extend FriendlyId
     friendly_id :number, slug_column: :number, use: :slugged
@@ -12,7 +12,9 @@ module Spree
     include Spree::Order::Checkout
     include Spree::Order::CurrencyUpdater
     include Spree::Order::Payments
+    include Spree::Order::StoreCredit
     include Spree::Core::NumberGenerator.new(prefix: 'R')
+    include Spree::Core::TokenGenerator
 
     extend Spree::DisplayMoney
     money_methods :outstanding_balance, :item_total,           :adjustment_total,
@@ -123,11 +125,10 @@ module Spree
     with_options presence: true do
       validates :number, length: { maximum: 32, allow_blank: true }, uniqueness: { allow_blank: true }
       validates :email, length: { maximum: 254, allow_blank: true }, email: { allow_blank: true }, if: :require_email
-      validates :state, inclusion: { in: state_machine.states.map { |state| state.name.to_s }, allow_blank: true }
       validates :item_count, numericality: { greater_than_or_equal_to: 0, less_than: 2**31, only_integer: true, allow_blank: true }
     end
-    validates :payment_state,        inclusion:    { in: ['balance_due', 'paid', 'credit_owed', 'failed', 'void'], allow_blank: true }
-    validates :shipment_state,       inclusion:    { in: ['ready', 'pending', 'partial', 'shipped', 'backorder', 'canceled'], allow_blank: true }
+    validates :payment_state,        inclusion:    { in: PAYMENT_STATES, allow_blank: true }
+    validates :shipment_state,       inclusion:    { in: SHIPMENT_STATES, allow_blank: true }
     validates :item_total,           POSITIVE_MONEY_VALIDATION
     validates :adjustment_total,     MONEY_VALIDATION
     validates :included_tax_total,   POSITIVE_MONEY_VALIDATION
@@ -136,8 +137,6 @@ module Spree
     validates :shipment_total,       MONEY_VALIDATION
     validates :promo_total,          NEGATIVE_MONEY_VALIDATION
     validates :total,                MONEY_VALIDATION
-
-    validate :has_available_shipment
 
     delegate :update_totals, :persist_totals, to: :updater
     delegate :merge!, to: :merger
@@ -151,17 +150,11 @@ module Spree
 
     scope :created_between, ->(start_date, end_date) { where(created_at: start_date..end_date) }
     scope :completed_between, ->(start_date, end_date) { where(completed_at: start_date..end_date) }
+    scope :complete, -> { where.not(completed_at: nil) }
+    scope :incomplete, -> { where(completed_at: nil) }
 
     # shows completed orders first, by their completed_at date, then uncompleted orders by their created_at
     scope :reverse_chronological, -> { order('spree_orders.completed_at IS NULL', completed_at: :desc, created_at: :desc) }
-
-    def self.complete
-      where.not(completed_at: nil)
-    end
-
-    def self.incomplete
-      where(completed_at: nil)
-    end
 
     # Use this method in other gems that wish to register their own custom logic
     # that should be called after Order#update
@@ -217,7 +210,7 @@ module Spree
         # Little hacky fix for #4117
         # If this wasn't here, order would transition to address state on confirm failure
         # because there would be no valid payments any more.
-        state == 'confirm'
+        confirm?
     end
 
     def backordered?
@@ -239,8 +232,13 @@ module Spree
       @updater ||= OrderUpdater.new(self)
     end
 
-    def update!
+    def update_with_updater!
       updater.update
+    end
+
+    def update!
+      warn "`update!` is deprecated as it conflicts with update! method of rails. Use `update_with_updater!` instead."
+      update_with_updater!
     end
 
     def merger
@@ -257,7 +255,7 @@ module Spree
     end
 
     def allow_cancel?
-      return false unless completed? and state != 'canceled'
+      return false if !completed? || canceled?
       shipment_state.nil? || %w{ready backorder pending}.include?(shipment_state)
     end
 
@@ -328,7 +326,7 @@ module Spree
     end
 
     def outstanding_balance
-      if state == 'canceled'
+      if canceled?
         -1 * payment_total
       elsif reimbursements.includes(:refunds).size > 0
         reimbursed = reimbursements.includes(:refunds).inject(0) do |sum, reimbursement|
@@ -419,8 +417,8 @@ module Spree
     # If so add error and restart checkout.
     def ensure_line_item_variants_are_not_discontinued
       if line_items.any?{ |li| !li.variant || li.variant.discontinued? }
-        errors.add(:base, Spree.t(:deleted_variants_present))
         restart_checkout_flow
+        errors.add(:base, Spree.t(:discontinued_variants_present))
         false
       else
         true
@@ -429,8 +427,8 @@ module Spree
 
     def ensure_line_items_are_in_stock
       if insufficient_stock_lines.present?
-        errors.add(:base, Spree.t(:insufficient_stock_lines_present))
         restart_checkout_flow
+        errors.add(:base, Spree.t(:insufficient_stock_lines_present))
         false
       else
         true
@@ -438,14 +436,21 @@ module Spree
     end
 
     def empty!
-      line_items.destroy_all
-      updater.update_item_count
-      adjustments.destroy_all
-      shipments.destroy_all
-      state_changes.destroy_all
+      if completed?
+        raise Spree.t(:cannot_empty_completed_order)
+      else
+        line_items.destroy_all
+        updater.update_item_count
+        adjustments.destroy_all
+        shipments.destroy_all
+        state_changes.destroy_all
+        order_promotions.destroy_all
 
-      update_totals
-      persist_totals
+        update_totals
+        persist_totals
+        restart_checkout_flow
+        self
+      end
     end
 
     def has_step?(step)
@@ -605,6 +610,20 @@ module Spree
 
     private
 
+    def create_store_credit_payment(payment_method, credit, amount)
+      payments.create!(
+        source: credit,
+        payment_method: payment_method,
+        amount: amount,
+        state: 'checkout',
+        response_code: credit.generate_authorization_code
+      )
+    end
+
+    def store_credit_amount(credit, total)
+      [credit.amount_remaining, total].min
+    end
+
     def link_by_email
       self.email = user.email if self.user
     end
@@ -620,13 +639,6 @@ module Spree
       end
     end
 
-    def has_available_shipment
-      return unless has_step?("delivery")
-      return unless has_step?(:address) && address?
-      return unless ship_address && ship_address.valid?
-      # errors.add(:base, :no_shipping_methods_available) if available_shipping_methods.empty?
-    end
-
     def ensure_available_shipping_rates
       if shipments.empty? || shipments.any? { |shipment| shipment.shipping_rates.blank? }
         # After this point, order redirects back to 'address' state and asks user to pick a proper address
@@ -639,8 +651,12 @@ module Spree
     def after_cancel
       shipments.each { |shipment| shipment.cancel! }
       payments.completed.each { |payment| payment.cancel! }
+
+      # Free up authorized store credits
+      payments.store_credits.pending.each(&:void!)
+
       send_cancel_email
-      self.update!
+      self.update_with_updater!
     end
 
     def send_cancel_email
@@ -661,10 +677,7 @@ module Spree
     end
 
     def create_token
-      self.guest_token ||= loop do
-        random_token = SecureRandom.urlsafe_base64(nil, false)
-        break random_token unless self.class.exists?(guest_token: random_token)
-      end
+      self.guest_token ||= generate_guest_token
     end
   end
 end

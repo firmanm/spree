@@ -20,6 +20,7 @@ module Spree
         update_payment_state
         update_shipments
         update_shipment_state
+        update_shipment_total
       end
       run_hooks
       persist_totals
@@ -41,7 +42,7 @@ module Spree
     # +item_total+         The total value of all LineItems
     # +adjustment_total+   The total value of all adjustments (promotions, credits, etc.)
     # +promo_total+        The total value of all promotion adjustments
-    # +total+              The so-called "order total."  This is equivalent to +item_total+ plus +adjustment_total+.
+    # +total+              The so-called "order total."  This is equivalent to +item_total+ plus +shipment_total+ plus +adjustment_total+.
     def update_totals
       update_payment_total
       update_item_total
@@ -154,13 +155,14 @@ module Spree
     # balance_due   when +payment_total+ is less than +total+
     # credit_owed   when +payment_total+ is greater than +total+
     # failed        when most recent payment is in the failed state
+    # void          when order is canceled and +payment_total+ is equal to zero
     #
     # The +payment_state+ value helps with reporting, etc. since it provides a quick and easy way to locate Orders needing attention.
     def update_payment_state
       last_state = order.payment_state
       if payments.present? && payments.valid.size == 0
         order.payment_state = 'failed'
-      elsif order.state == 'canceled' && order.payment_total == 0
+      elsif order.canceled? && order.payment_total == 0
         order.payment_state = 'void'
       else
         order.payment_state = 'balance_due' if order.outstanding_balance > 0

@@ -1,6 +1,6 @@
 module Spree
   class LineItem < Spree::Base
-    before_validation :invalid_quantity_check
+    before_validation :ensure_valid_quantity
 
     with_options inverse_of: :line_items do
       belongs_to :order, class_name: "Spree::Order", touch: true
@@ -17,13 +17,9 @@ module Spree
     before_validation :copy_tax_category
 
     validates :variant, presence: true
-    validates :quantity, numericality:
-                        {
-                          only_integer: true,
-                          greater_than: -1,
-                          message: Spree.t('validation.must_be_int')
-                        }
+    validates :quantity, numericality: { only_integer: true, message: Spree.t('validation.must_be_int') }
     validates :price, numericality: true
+
     validates_with Stock::AvailabilityValidator
     validate :ensure_proper_currency
 
@@ -34,7 +30,6 @@ module Spree
     after_save :update_adjustments
 
     after_create :update_tax_charge
-    # after_create :update_adjustment_total
 
     delegate :name, :description, :sku, :should_track_inventory?, :product, to: :variant
     delegate :tax_zone, to: :order
@@ -89,7 +84,8 @@ module Spree
     alias money display_total
 
     def invalid_quantity_check
-      self.quantity = 0 if quantity.nil? || quantity < 0
+      warn "`invalid_quantity_check` is deprecated. Use private `ensure_valid_quantity` instead."
+      ensure_valid_quantity
     end
 
     def sufficient_stock?
@@ -112,6 +108,10 @@ module Spree
     end
 
     private
+
+    def ensure_valid_quantity
+      self.quantity = 0 if quantity.nil? || quantity < 0
+    end
 
     def update_price_from_modifier(currency, opts)
       if currency

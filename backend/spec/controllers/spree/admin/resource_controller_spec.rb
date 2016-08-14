@@ -20,7 +20,7 @@ describe Spree::Admin::WidgetsController, :type => :controller do
     Rails.application.reload_routes!
   end
 
-  with_model 'Widget' do
+  with_model 'Widget', scope: :all do
     table do |t|
       t.string :name
       t.integer :position
@@ -79,17 +79,6 @@ describe Spree::Admin::WidgetsController, :type => :controller do
       expect { subject }.to change { Widget.count }.by(1)
     end
 
-    context 'failure' do
-      let(:params) do
-        {widget: {name: ''}} # blank name generates an error
-      end
-
-      it 'sets a flash error' do
-        subject
-        expect(flash[:error]).to eq assigns(:widget).errors.full_messages.join(', ')
-      end
-    end
-
     context 'without any parameters' do
       let(:params) { {} }
 
@@ -117,20 +106,6 @@ describe Spree::Admin::WidgetsController, :type => :controller do
 
     it 'updates the resource' do
       expect { subject }.to change { widget.reload.name }.from('a widget').to('widget renamed')
-    end
-
-    context 'failure' do
-      let(:params) do
-        {
-          id: widget.to_param,
-          widget: {name: ''}, # a blank name will trigger a validation error
-        }
-      end
-
-      it 'sets a flash error' do
-        subject
-        expect(flash[:error]).to eq assigns(:widget).errors.full_messages.join(', ')
-      end
     end
   end
 
@@ -165,7 +140,9 @@ describe Spree::Admin::WidgetsController, :type => :controller do
     end
 
     it 'touches updated_at' do
-      expect { subject }.to change { widget_1.reload.updated_at }
+      Timecop.scale(3600) do
+        expect { subject }.to change { widget_1.reload.updated_at }
+      end
     end
   end
 end
@@ -196,7 +173,7 @@ describe Spree::Admin::Submodule::PostsController, type: :controller do
     Rails.application.reload_routes!
   end
 
-  with_table 'spree_posts' do |t|
+  with_table 'spree_posts', scope: :all do |t|
     t.string :name
     t.integer :position
     t.timestamps null: false
@@ -273,4 +250,3 @@ describe Spree::Admin::Submodule::PostsController, type: :controller do
     end
   end
 end
-

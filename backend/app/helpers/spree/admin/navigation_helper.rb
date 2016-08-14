@@ -96,7 +96,16 @@ module Spree
 
         select_tag(:per_page,
           options_for_select(per_page_options, params['per_page'] || per_page_default),
-          { id: "js-per-page-select", class: "form-control pull-right" })
+          { class: "form-control pull-right js-per-page-select" })
+      end
+
+      # helper method to create proper url to apply per page filtering
+      # fixes https://github.com/spree/spree/issues/6888
+      def per_page_dropdown_params(args = nil)
+        args ||= params.clone
+        args.delete(:page)
+        args.delete(:per_page)
+        args
       end
 
       # finds class for a given symbol / string
@@ -116,9 +125,11 @@ module Spree
       end
 
       def link_to_clone(resource, options={})
-        options[:data] = { action: 'clone' }
-        options[:class] = "btn btn-primary btn-sm"
-        link_to_with_icon('clone', Spree.t(:clone), clone_object_url(resource), options)
+        options[:data] = { action: 'clone', :'original-title' => Spree.t(:clone) }
+        options[:class] = "btn btn-primary btn-sm with-tip"
+        options[:method] = :post
+        options[:icon] = :clone
+        button_link_to '', clone_object_url(resource), options
       end
 
       def link_to_new(resource)
@@ -152,7 +163,7 @@ module Spree
         options[:class] = (options[:class].to_s + " icon-link with-tip action-#{icon_name}").strip
         options[:class] += ' no-text' if options[:no_text]
         options[:title] = text if options[:no_text]
-        text = options[:no_text] ? '' : raw("<span class='text'>#{text}</span>")
+        text = options[:no_text] ? '' : content_tag(:span, text, class: 'text')
         options.delete(:no_text)
         if icon_name
           icon = content_tag(:span, '', class: "icon icon-#{icon_name}")
@@ -177,7 +188,7 @@ module Spree
         if (html_options[:method] &&
             html_options[:method].to_s.downcase != 'get' &&
             !html_options[:remote])
-          form_tag(url, method: html_options.delete(:method)) do
+          form_tag(url, method: html_options.delete(:method), class: 'display-inline') do
             button(text, html_options.delete(:icon), nil, html_options)
           end
         else
@@ -208,10 +219,12 @@ module Spree
       end
 
       def configurations_sidebar_menu_item(link_text, url, options = {})
-        is_active = url.ends_with?(controller.controller_name) ||
-                    url.ends_with?("#{controller.controller_name}/edit") ||
-                    url.ends_with?("#{controller.controller_name.singularize}/edit")
-        options.merge!(class: is_active ? 'active' : nil)
+        is_selected = url.ends_with?(controller.controller_name) ||
+                      url.ends_with?("#{controller.controller_name}/edit") ||
+                      url.ends_with?("#{controller.controller_name.singularize}/edit")
+
+        options[:class] = 'sidebar-menu-item'
+        options[:class] << ' selected' if is_selected
         content_tag(:li, options) do
           link_to(link_text, url)
         end

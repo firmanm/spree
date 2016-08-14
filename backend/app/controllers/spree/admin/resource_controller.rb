@@ -30,18 +30,17 @@ class Spree::Admin::ResourceController < Spree::Admin::BaseController
     invoke_callbacks(:update, :before)
     if @object.update_attributes(permitted_resource_params)
       invoke_callbacks(:update, :after)
-      flash[:success] = flash_message_for(@object, :successfully_updated)
       respond_with(@object) do |format|
-        format.html { redirect_to location_after_save }
+        format.html do
+          flash[:success] = flash_message_for(@object, :successfully_updated)
+          redirect_to location_after_save
+        end
         format.js { render layout: false }
       end
     else
       invoke_callbacks(:update, :fails)
       respond_with(@object) do |format|
-        format.html do
-          flash.now[:error] = @object.errors.full_messages.join(", ")
-          render action: 'edit'
-        end
+        format.html { render action: :edit }
         format.js { render layout: false }
       end
     end
@@ -60,10 +59,7 @@ class Spree::Admin::ResourceController < Spree::Admin::BaseController
     else
       invoke_callbacks(:create, :fails)
       respond_with(@object) do |format|
-        format.html do
-          flash.now[:error] = @object.errors.full_messages.join(", ")
-          render action: 'new'
-        end
+        format.html { render action: :new }
         format.js { render layout: false }
       end
     end
@@ -86,15 +82,14 @@ class Spree::Admin::ResourceController < Spree::Admin::BaseController
     if @object.destroy
       invoke_callbacks(:destroy, :after)
       flash[:success] = flash_message_for(@object, :successfully_removed)
-      respond_with(@object) do |format|
-        format.html { redirect_to location_after_destroy }
-        format.js   { render :partial => "spree/admin/shared/destroy" }
-      end
     else
       invoke_callbacks(:destroy, :fails)
-      respond_with(@object) do |format|
-        format.html { redirect_to location_after_destroy }
-      end
+      flash[:error] = @object.errors.full_messages.join(', ')
+    end
+
+    respond_with(@object) do |format|
+      format.html { redirect_to location_after_destroy }
+      format.js   { render_js_for_destroy }
     end
   end
 

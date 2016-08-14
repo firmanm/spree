@@ -408,14 +408,32 @@ describe Spree::Order, :type => :model do
         context 'when there is at least one valid payment' do
           let(:payment_state) { 'checkout' }
 
-          before do
-            expect(order).to receive(:process_payments!).once { true }
+          context 'line_items are in stock' do
+            before do
+              expect(order).to receive(:process_payments!).once { true }
+            end
+
+            it "transitions to complete" do
+              order.next!
+              assert_state_changed(order, 'payment', 'complete')
+              expect(order.state).to eq('complete')
+            end
           end
 
-          it "transitions to complete" do
-            order.next!
-            assert_state_changed(order, 'payment', 'complete')
-            expect(order.state).to eq('complete')
+          context 'line_items are not in stock' do
+            before do
+              expect(order).to receive(:ensure_line_items_are_in_stock).once { false }
+            end
+
+            it 'should not receive process_payments!' do
+              expect(order).not_to receive(:process_payments!)
+              order.next
+            end
+
+            it 'does not transition to complete' do
+              order.next
+              expect(order.state).to eq('payment')
+            end
           end
         end
 
@@ -587,6 +605,10 @@ describe Spree::Order, :type => :model do
         order = Spree::Order.new
         expect(order.checkout_steps).to eq(%w(new_step before_address address delivery complete))
       end
+
+      it 'goes through checkout without raising error' do
+        expect{ OrderWalkthrough.up_to(:complete) }.to_not raise_error
+      end
     end
 
     context "after" do
@@ -599,6 +621,10 @@ describe Spree::Order, :type => :model do
       specify do
         order = Spree::Order.new
         expect(order.checkout_steps).to eq(%w(new_step address after_address delivery complete))
+      end
+
+      it 'goes through checkout without raising error' do
+        expect{ OrderWalkthrough.up_to(:complete) }.to_not raise_error
       end
     end
   end

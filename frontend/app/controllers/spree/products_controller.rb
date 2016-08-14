@@ -10,7 +10,7 @@ module Spree
 
     def index
       @searcher = build_searcher(params.merge(include_images: true))
-      @products = @searcher.retrieve_products
+      @products = @searcher.retrieve_products.includes(:possible_promotions)
       @taxonomies = Spree::Taxonomy.includes(root: :children)
     end
 
@@ -20,7 +20,7 @@ module Spree
                            active(current_currency).
                            includes([:option_values, :images])
       @product_properties = @product.product_properties.includes(:property)
-      @taxon = Spree::Taxon.find(params[:taxon_id]) if params[:taxon_id]
+      @taxon = params[:taxon_id].present? ? Spree::Taxon.find(params[:taxon_id]) : @product.taxons.first
       redirect_if_legacy_path
     end
 

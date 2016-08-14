@@ -11,6 +11,7 @@ Spree::Core::Engine.add_routes do
 
       concern :order_routes do
         member do
+          put :approve
           put :cancel
           put :empty
           put :apply_coupon_code
@@ -115,6 +116,9 @@ Spree::Core::Engine.add_routes do
     end
 
     match 'v:api/*path', to: redirect("/api/v1/%{path}"), via: [:get, :post, :put, :patch, :delete]
-    match '*path', to: redirect("/api/v1/%{path}"), via: [:get, :post, :put, :patch, :delete]
+
+    match '*path', to: redirect{ |params, request|
+      "/api/v1/#{params[:path]}?#{request.query_string}"
+    }, via: [:get, :post, :put, :patch, :delete]
   end
 end

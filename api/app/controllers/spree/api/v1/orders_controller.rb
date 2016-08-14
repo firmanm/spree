@@ -2,7 +2,6 @@ module Spree
   module Api
     module V1
       class OrdersController < Spree::Api::BaseController
-        skip_before_action :check_for_user_or_api_key, only: :apply_coupon_code
         skip_before_action :authenticate_user, only: :apply_coupon_code
 
         before_action :find_order, except: [:create, :mine, :current, :index, :update]
@@ -17,8 +16,14 @@ module Spree
 
         def cancel
           authorize! :update, @order, params[:token]
-          @order.cancel!
-          respond_with(@order, :default_template => :show)
+          @order.canceled_by(current_api_user)
+          respond_with(@order, default_template: :show)
+        end
+
+        def approve
+          authorize! :approve, @order, params[:token]
+          @order.approved_by(current_api_user)
+          respond_with(@order, default_template: :show)
         end
 
         def create
@@ -94,7 +99,7 @@ module Spree
           @order.coupon_code = params[:coupon_code]
           @handler = PromotionHandler::Coupon.new(@order).apply
           status = @handler.successful? ? 200 : 422
-          render "spree/api/v1/promotions/handler", :status => status
+          render "spree/api/v1/promotions/handler", status: status
         end
 
         private
