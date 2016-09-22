@@ -16,6 +16,22 @@ module Spree
     has_many :capture_events, :class_name => 'Spree::PaymentCaptureEvent'
     has_many :refunds, inverse_of: :payment
 
+
+    attr_accessor :validate_bank_details
+
+    has_attached_file :receipt_img, dependent: :destroy
+    validates_attachment :receipt_img, :content_type => { :content_type => /\Aimage\/.*\Z/ }, :size => { :in => 0..5.megabytes }
+
+    validates :bank_name, :account_name, :account_no, :deposited_on, :presence => true, :if => :validate_bank_details
+    validates :bank_name, :length => { :minimum => 3, :too_short => "must have at least %{count} words"}, :if => :validate_bank_details
+    validates :account_no, :length => { :minimum => 5 }, :numericality => true, :if => :validate_bank_details
+
+    scope :from_bank_transfer, -> { joins(:payment_method).where(:spree_payment_methods => { :type => 'Spree::PaymentMethod::BankTransfer' }) }
+
+    def details_submitted?
+      transaction_reference_no?
+    end
+
     validates_presence_of :payment_method
     before_validation :validate_source
     before_create :set_unique_identifier

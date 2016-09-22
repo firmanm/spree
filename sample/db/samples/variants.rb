@@ -32,61 +32,71 @@ variants = [
     :product => ror_baseball_jersey,
     :option_values => [small, red],
     :sku => "ROR-00001",
-    :cost_price => 17
+    :cost_price => 17,
+    :seller_sku => "tes123"
   },
   {
     :product => ror_baseball_jersey,
     :option_values => [small, blue],
     :sku => "ROR-00002",
-    :cost_price => 17
+    :cost_price => 17,
+    :seller_sku => "tes123"
   },
   {
     :product => ror_baseball_jersey,
     :option_values => [small, green],
     :sku => "ROR-00003",
-    :cost_price => 17
+    :cost_price => 17,
+    :seller_sku => "tes123"
   },
   {
     :product => ror_baseball_jersey,
     :option_values => [medium, red],
     :sku => "ROR-00004",
-    :cost_price => 17
+    :cost_price => 17,
+    :seller_sku => "tes123"
   },
   {
     :product => ror_baseball_jersey,
     :option_values => [medium, blue],
     :sku => "ROR-00005",
-    :cost_price => 17
+    :cost_price => 17,
+    :seller_sku => "tes123"
   },
   {
     :product => ror_baseball_jersey,
     :option_values => [medium, green],
     :sku => "ROR-00006",
-    :cost_price => 17
+    :cost_price => 17,
+    :seller_sku => "tes123"
   },
   {
     :product => ror_baseball_jersey,
     :option_values => [large, red],
     :sku => "ROR-00007",
-    :cost_price => 17
+    :cost_price => 17,
+    :seller_sku => "tes123"
   },
   {
     :product => ror_baseball_jersey,
     :option_values => [large, blue],
     :sku => "ROR-00008",
-    :cost_price => 17
+    :cost_price => 17,
+    :seller_sku => "tes123"
   },
   {
     :product => ror_baseball_jersey,
     :option_values => [large, green],
     :sku => "ROR-00009",
-    :cost_price => 17
+    :cost_price => 17,
+    :seller_sku => "tes123"
   },
   {
     :product => ror_baseball_jersey,
     :option_values => [extra_large, green],
     :sku => "ROR-00010",
-    :cost_price => 17
+    :cost_price => 17,
+    :seller_sku => "tes123"
   },
 ]
 
@@ -94,66 +104,82 @@ masters = {
   ror_baseball_jersey => {
     :sku => "ROR-001",
     :cost_price => 17,
+    :seller_sku => "tes123",
   },
   ror_tote => {
     :sku => "ROR-00011",
-    :cost_price => 17
+    :cost_price => 17,
+    :seller_sku => "tes123"
   },
   ror_bag => {
     :sku => "ROR-00012",
-    :cost_price => 21
+    :cost_price => 21,
+    :seller_sku => "tes123"
   },
   ror_jr_spaghetti => {
     :sku => "ROR-00013",
-    :cost_price => 17
+    :cost_price => 17,
+    :seller_sku => "tes123"
   },
   ror_mug => {
     :sku => "ROR-00014",
-    :cost_price => 11
+    :cost_price => 11,
+    :seller_sku => "tes123"
   },
   ror_ringer => {
     :sku => "ROR-00015",
-    :cost_price => 17
+    :cost_price => 17,
+    :seller_sku => "tes123"
   },
   ror_stein => {
     :sku => "ROR-00016",
-    :cost_price => 15
+    :cost_price => 15,
+    :seller_sku => "tes123"
   },
   apache_baseball_jersey => {
     :sku => "APC-00001",
-    :cost_price => 17
+    :cost_price => 17,
+    :seller_sku => "tes123"
   },
   ruby_baseball_jersey => {
     :sku => "RUB-00001",
-    :cost_price => 17
+    :cost_price => 17,
+    :seller_sku => "tes123"
   },
   spree_baseball_jersey => {
     :sku => "SPR-00001",
-    :cost_price => 17
+    :cost_price => 17,
+    :seller_sku => "tes123"
   },
   spree_stein => {
     :sku => "SPR-00016",
-    :cost_price => 15
+    :cost_price => 15,
+    :seller_sku => "tes123"
   },
   spree_jr_spaghetti => {
     :sku => "SPR-00013",
-    :cost_price => 17
+    :cost_price => 17,
+    :seller_sku => "tes123"
   },
   spree_mug => {
     :sku => "SPR-00014",
-    :cost_price => 11
+    :cost_price => 11,
+    :seller_sku => "tes123"
   },
   spree_ringer => {
     :sku => "SPR-00015",
-    :cost_price => 17
+    :cost_price => 17,
+    :seller_sku => "tes123"
   },
   spree_tote => {
     :sku => "SPR-00011",
-    :cost_price => 13
+    :cost_price => 13,
+    :seller_sku => "tes123"
   },
   spree_bag => {
     :sku => "SPR-00012",
-    :cost_price => 21
+    :cost_price => 21,
+    :seller_sku => "tes123"
   }
 }
 

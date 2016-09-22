@@ -16,6 +16,7 @@ products = [
     :shipping_category => shipping_category,
     :price => 15.99,
     :eur_price => 14,
+    :seller_sku => "tes123"
   },
   {
     :name => "Ruby on Rails Bag",
@@ -23,20 +24,23 @@ products = [
     :shipping_category => shipping_category,
     :price => 22.99,
     :eur_price => 19,
+    :seller_sku => "tes123"
   },
   {
     :name => "Ruby on Rails Baseball Jersey",
     :tax_category => clothing,
     :shipping_category => shipping_category,
     :price => 19.99,
-    :eur_price => 16
+    :eur_price => 16,
+    :seller_sku => "tes123"
   },
   {
     :name => "Ruby on Rails Jr. Spaghetti",
     :tax_category => clothing,
     :shipping_category => shipping_category,
     :price => 19.99,
-    :eur_price => 16
+    :eur_price => 16,
+    :seller_sku => "tes123"
 
   },
   {
@@ -44,42 +48,48 @@ products = [
     :shipping_category => shipping_category,
     :tax_category => clothing,
     :price => 19.99,
-    :eur_price => 16
+    :eur_price => 16,
+    :seller_sku => "tes123"
   },
   {
     :name => "Ruby Baseball Jersey",
     :tax_category => clothing,
     :shipping_category => shipping_category,
     :price => 19.99,
-    :eur_price => 16
+    :eur_price => 16,
+    :seller_sku => "tes123"
   },
   {
     :name => "Apache Baseball Jersey",
     :tax_category => clothing,
     :shipping_category => shipping_category,
     :price => 19.99,
-    :eur_price => 16
+    :eur_price => 16,
+    :seller_sku => "tes123"
   },
   {
     :name => "Spree Baseball Jersey",
     :tax_category => clothing,
     :shipping_category => shipping_category,
     :price => 19.99,
-    :eur_price => 16
+    :eur_price => 16,
+    :seller_sku => "tes123"
   },
   {
     :name => "Spree Jr. Spaghetti",
     :tax_category => clothing,
     :shipping_category => shipping_category,
     :price => 19.99,
-    :eur_price => 16
+    :eur_price => 16,
+    :seller_sku => "tes123"
   },
   {
     :name => "Spree Ringer T-Shirt",
     :tax_category => clothing,
     :shipping_category => shipping_category,
     :price => 19.99,
-    :eur_price => 16
+    :eur_price => 16,
+    :seller_sku => "tes123"
   },
   {
     :name => "Spree Tote",
@@ -87,37 +97,43 @@ products = [
     :shipping_category => shipping_category,
     :price => 15.99,
     :eur_price => 14,
+    :seller_sku => "tes123"
   },
   {
     :name => "Spree Bag",
     :tax_category => clothing,
     :shipping_category => shipping_category,
     :price => 22.99,
-    :eur_price => 19
+    :eur_price => 19,
+    :seller_sku => "tes123"
   },
   {
     :name => "Ruby on Rails Mug",
     :shipping_category => shipping_category,
     :price => 13.99,
-    :eur_price => 12
+    :eur_price => 12,
+    :seller_sku => "tes123"
   },
   {
     :name => "Ruby on Rails Stein",
     :shipping_category => shipping_category,
     :price => 16.99,
-    :eur_price => 14
+    :eur_price => 14,
+    :seller_sku => "tes123"
   },
   {
     :name => "Spree Stein",
     :shipping_category => shipping_category,
     :price => 16.99,
     :eur_price => 14,
+    :seller_sku => "tes123"
   },
   {
     :name => "Spree Mug",
     :shipping_category => shipping_category,
     :price => 13.99,
-    :eur_price => 12
+    :eur_price => 12,
+    :seller_sku => "tes123"
   }
 ]
 
