@@ -13,7 +13,7 @@ module Spree
 
     with_options presence: true do
       validates :amount, numericality: { allow_nil: true }
-      validates :tax_category_id
+      validates :tax_category
     end
 
     scope :by_zone, -> (zone) { where(zone_id: zone.id) }
@@ -71,6 +71,12 @@ module Spree
         relevant_rates.each do |rate|
           rate.adjust(order, item)
         end
+      end
+
+      # updates pre_tax for items without any tax rates
+      remaining_items = items - relevant_items
+      remaining_items.each do |item|
+        store_pre_tax_amount(item, [])
       end
     end
 

@@ -1,8 +1,10 @@
 $(document).ready ->
   window.productTemplate = Handlebars.compile($('#product_template').text());
   $('#taxon_products').sortable({
-      handle: ".js-sort-handle"
-    });
+    handle: ".js-sort-handle"
+  });
+  formatTaxon = (taxon) ->
+    Select2.util.escapeMarkup(taxon.pretty_name)
   $('#taxon_products').on "sortstop", (event, ui) ->
     $.ajax
       url: Spree.routes.classifications_api,
@@ -19,7 +21,7 @@ $(document).ready ->
       dropdownCssClass: "taxon_select_box",
       placeholder: Spree.translations.find_a_taxon,
       ajax:
-        url: Spree.routes.taxons_search,
+        url: Spree.routes.taxons_api,
         datatype: 'json',
         data: (term, page) ->
           per_page: 50,
@@ -32,10 +34,8 @@ $(document).ready ->
           more = page < data.pages;
           results: data['taxons'],
           more: more
-      formatResult: (taxon) ->
-        taxon.pretty_name;
-      formatSelection: (taxon) ->
-        taxon.pretty_name;
+      formatResult: formatTaxon,
+      formatSelection: formatTaxon
 
   $('#taxon_id').on "change", (e) ->
     el = $('#taxon_products')

@@ -2,10 +2,16 @@
 
 require 'spec_helper'
 
-describe Spree::Variant, :type => :model do
+describe Spree::Variant, type: :model do
   let!(:variant) { create(:variant) }
+  let(:master_variant) { create(:master_variant) }
 
   it_behaves_like 'default_price'
+
+  describe 'validations' do
+    it { expect(master_variant).to_not validate_presence_of(:option_values) }
+    it { expect(variant).to validate_presence_of(:option_values) }
+  end
 
   context 'sorting' do
     it 'responds to set_list_position' do
@@ -30,7 +36,7 @@ describe Spree::Variant, :type => :model do
 
     it "propagate to stock items" do
       expect_any_instance_of(Spree::StockLocation).to receive(:propagate_variant)
-      product.variants.create(:name => "Foobar")
+      create(:variant, product: product)
     end
 
     context "stock location has disable propagate all variants" do
@@ -38,7 +44,7 @@ describe Spree::Variant, :type => :model do
 
       it "propagate to stock items" do
         expect_any_instance_of(Spree::StockLocation).not_to receive(:propagate_variant)
-        product.variants.create(:name => "Foobar")
+        product.variants.create(name: "Foobar")
       end
     end
 
@@ -51,19 +57,123 @@ describe Spree::Variant, :type => :model do
       end
 
       context 'when a variant is created' do
-        before(:each) do
-          product.variants.create!(:name => 'any-name')
-        end
+        let!(:new_variant) { create(:variant, product: product) }
 
         it { expect(product.master).to_not be_in_stock }
       end
     end
   end
 
+  describe 'scope' do
+    describe '.not_discontinued' do
+      context 'when discontinued' do
+        let!(:discontinued_variant) { create(:variant, discontinue_on: Time.current - 1.day) }
+
+        it { expect(Spree::Variant.not_discontinued).not_to include(discontinued_variant) }
+      end
+
+      context 'when not discontinued' do
+        let!(:variant_2) { create(:variant, discontinue_on: Time.current + 1.day) }
+
+        it { expect(Spree::Variant.not_discontinued).to include(variant_2) }
+      end
+
+      context 'when discontinue_on not present' do
+        let!(:variant_2) { create(:variant, discontinue_on: nil) }
+
+        it { expect(Spree::Variant.not_discontinued).to include(variant_2) }
+      end
+    end
+
+    describe '.not_deleted' do
+      context 'when deleted' do
+        let!(:deleted_variant) { create(:variant, deleted_at: Time.current) }
+
+        it { expect(Spree::Variant.not_deleted).not_to include(deleted_variant) }
+      end
+
+      context 'when not deleted' do
+        let!(:variant_2) { create(:variant, deleted_at: nil) }
+
+        it { expect(Spree::Variant.not_deleted).to include(variant_2) }
+      end
+    end
+
+    describe '.for_currency_and_available_price_amount' do
+      let(:currency) { 'EUR' }
+
+      context 'when price with currency present' do
+        context 'when price has amount' do
+          let!(:price_1) { create(:price, currency: currency, variant: variant, amount: 10) }
+
+          it { expect(Spree::Variant.for_currency_and_available_price_amount(currency)).to include(variant) }
+        end
+
+        context 'when price do not have amount' do
+          let!(:price_1) { create(:price, currency: currency, variant: variant, amount: nil) }
+
+          it { expect(Spree::Variant.for_currency_and_available_price_amount(currency)).not_to include(variant) }
+        end
+      end
+
+      context 'when price with currency not present' do
+        let!(:unavailable_currency) { 'INR' }
+        context 'when price has amount' do
+          let!(:price_1) { create(:price, currency: unavailable_currency, variant: variant, amount: 10) }
+
+          it { expect(Spree::Variant.for_currency_and_available_price_amount(currency)).not_to include(variant) }
+        end
+
+        context 'when price do not have amount' do
+          let!(:price_1) { create(:price, currency: unavailable_currency, variant: variant, amount: nil) }
+
+          it { expect(Spree::Variant.for_currency_and_available_price_amount(currency)).not_to include(variant) }
+        end
+      end
+
+      context 'when multiple prices for same currency present' do
+        let!(:price_1) { create(:price, currency: currency, variant: variant) }
+        let!(:price_2) { create(:price, currency: currency, variant: variant) }
+
+        it 'should not duplicate variant' do
+          expect(Spree::Variant.for_currency_and_available_price_amount(currency)).to eq([variant])
+        end
+      end
+    end
+
+    describe '.active' do
+      let!(:variants) { [variant] }
+      let!(:currency) { 'EUR' }
+
+      before(:each) do
+        allow(Spree::Variant).to receive(:not_discontinued).and_return(variants)
+        allow(variants).to receive(:not_deleted).and_return(variants)
+        allow(variants).to receive(:for_currency_and_available_price_amount).with(currency).and_return(variants)
+      end
+
+      it 'should find not_discontinued variants' do
+        expect(Spree::Variant).to receive(:not_discontinued).and_return(variants)
+        Spree::Variant.active(currency)
+      end
+
+      it 'should find not_deleted variants' do
+        expect(variants).to receive(:not_deleted).and_return(variants)
+        Spree::Variant.active(currency)
+      end
+
+      it 'should find variants for_currency_and_available_price_amount' do
+        expect(variants).to receive(:for_currency_and_available_price_amount).with(currency).and_return(variants)
+        Spree::Variant.active(currency)
+      end
+
+      it { expect(Spree::Variant.active(currency)).to eq(variants) }
+    end
+  end
+
   context "product has other variants" do
     describe "option value accessors" do
       before {
-        @multi_variant = FactoryGirl.create :variant, :product => variant.product
+        @multi_variant = FactoryGirl.create :variant, product: variant.product
         variant.product.reload
       }
 
@@ -95,7 +205,7 @@ describe Spree::Variant, :type => :model do
     context "product has other variants" do
       describe "option value accessors" do
         before {
-          @multi_variant = create(:variant, :product => variant.product)
+          @multi_variant = create(:variant, product: variant.product)
           variant.product.reload
         }
 
@@ -172,7 +282,7 @@ describe Spree::Variant, :type => :model do
 
   describe '.price_in' do
     before do
-      variant.prices << create(:price, :variant => variant, :currency => "EUR", :amount => 33.33)
+      variant.prices << create(:price, variant: variant, currency: "EUR", amount: 33.33)
     end
     subject { variant.price_in(currency).display_amount }
 
@@ -203,7 +313,7 @@ describe Spree::Variant, :type => :model do
 
   describe '.amount_in' do
     before do
-      variant.prices << create(:price, :variant => variant, :currency => "EUR", :amount => 33.33)
+      variant.prices << create(:price, variant: variant, currency: "EUR", amount: 33.33)
     end
 
     subject { variant.amount_in(currency) }
@@ -235,13 +345,14 @@ describe Spree::Variant, :type => :model do
 
   # Regression test for #2432
   describe 'options_text' do
-    let!(:variant) { create(:variant, option_values: []) }
+    let!(:variant) { build(:variant, option_values: []) }
     let!(:master) { create(:master_variant) }
 
     before do
       # Order bar than foo
       variant.option_values << create(:option_value, {name: 'Foo', presentation: 'Foo', option_type: create(:option_type, position: 2, name: 'Foo Type', presentation: 'Foo Type')})
       variant.option_values << create(:option_value, {name: 'Bar', presentation: 'Bar', option_type: create(:option_type, position: 1, name: 'Bar Type', presentation: 'Bar Type')})
+      variant.save
     end
 
     it 'should order by bar than foo' do
@@ -251,7 +362,7 @@ describe Spree::Variant, :type => :model do
   end
 
   describe 'exchange_name' do
-    let!(:variant) { create(:variant, option_values: []) }
+    let!(:variant) { build(:variant, option_values: []) }
     let!(:master) { create(:master_variant) }
 
     before do
@@ -260,6 +371,7 @@ describe Spree::Variant, :type => :model do
                                                      presentation: 'Foo',
                                                      option_type: create(:option_type, position: 2, name: 'Foo Type', presentation: 'Foo Type')
                                                    })
+      variant.save
     end
 
     context 'master variant' do
@@ -277,7 +389,7 @@ describe Spree::Variant, :type => :model do
   end
 
   describe 'exchange_name' do
-    let!(:variant) { create(:variant, option_values: []) }
+    let!(:variant) { build(:variant, option_values: []) }
     let!(:master) { create(:master_variant) }
 
     before do
@@ -286,6 +398,7 @@ describe Spree::Variant, :type => :model do
                                                      presentation: 'Foo',
                                                      option_type: create(:option_type, position: 2, name: 'Foo Type', presentation: 'Foo Type')
                                                    })
+      variant.save
     end
 
     context 'master variant' do
@@ -303,7 +416,7 @@ describe Spree::Variant, :type => :model do
   end
 
   describe 'descriptive_name' do
-    let!(:variant) { create(:variant, option_values: []) }
+    let!(:variant) { build(:variant, option_values: []) }
     let!(:master) { create(:master_variant) }
 
     before do
@@ -312,6 +425,7 @@ describe Spree::Variant, :type => :model do
                                                      presentation: 'Foo',
                                                      option_type: create(:option_type, position: 2, name: 'Foo Type', presentation: 'Foo Type')
                                                    })
+      variant.save
     end
 
     context 'master variant' do
@@ -529,6 +643,12 @@ describe Spree::Variant, :type => :model do
       variant.reload
       expect(variant.discontinued?).to be(true)
     end
+
+    it "changes updated_at" do
+      Timecop.scale(1000) do
+        expect { variant.discontinue! }.to change { variant.updated_at }
+      end
+    end
   end
 
   context "#discontinued?" do
@@ -540,6 +660,150 @@ describe Spree::Variant, :type => :model do
     let(:variant_discontinued) { build(:variant, discontinue_on: Time.now - 1.day) }
     it "should be true" do
       expect(variant_discontinued.discontinued?).to be(true)
+    end
+  end
+
+  describe "#available?" do
+    let(:variant) { create(:variant) }
+    context 'when discontinued' do
+      before(:each) do
+        variant.discontinue_on = Time.current - 1.day
+      end
+
+      context 'when product is available' do
+        before(:each) do
+          allow(variant.product).to receive(:available?) { true }
+        end
+
+        it { expect(variant.available?).to be(false) }
+      end
+
+      context 'when product is not available' do
+        before(:each) do
+          allow(variant.product).to receive(:available?) { false }
+        end
+
+        it { expect(variant.available?).to be(false) }
+      end
+    end
+
+    context 'when not discontinued' do
+      before(:each) do
+        variant.discontinue_on = Time.current + 1.day
+      end
+
+      context 'when product is available' do
+        before(:each) do
+          allow(variant.product).to receive(:available?) { true }
+        end
+
+        it { expect(variant.available?).to be(true) }
+      end
+
+      context 'when product is not available' do
+        before(:each) do
+          allow(variant.product).to receive(:available?) { false }
+        end
+
+        it { expect(variant.available?).to be(false) }
+      end
+    end
+  end
+
+  describe "#check_price" do
+    let(:variant) { create(:variant) }
+    let(:variant2) { create(:variant) }
+
+    context 'require_master_price set false' do
+      before { Spree::Config.set(require_master_price: false) }
+
+      context 'price present and currency present' do
+        it { expect(variant.send(:check_price)).to be(nil) }
+      end
+
+      context 'price present and currency nil' do
+        before { variant.currency = nil }
+
+        it { expect(variant.send(:check_price)).to be(Spree::Config[:currency]) }
+      end
+
+      context 'price nil and currency present' do
+        before { variant.price = nil }
+
+        it { expect(variant.send(:check_price)).to be(nil) }
+      end
+
+      context 'price nil and currency nil' do
+        before { variant.price = nil }
+
+        it { expect(variant.send(:check_price)).to be(nil) }
+      end
+    end
+
+    context 'require_master_price set true' do
+      before { Spree::Config.set(require_master_price: true) }
+
+      context 'price present and currency present' do
+        it { expect(variant.send(:check_price)).to be(nil) }
+      end
+
+      context 'price present and currency nil' do
+        before { variant.currency = nil }
+
+        it { expect(variant.send(:check_price)).to be(Spree::Config[:currency]) }
+      end
+
+      context 'product and master_variant present and equal' do
+        context 'price nil and currency present' do
+          before { variant.price = nil }
+          it { expect(variant.send(:check_price)).to be(nil) }
+
+          context 'check variant price' do
+            before { variant.send(:check_price) }
+            it { expect(variant.price).to eq(variant.product.master.price) }
+          end
+        end
+
+        context 'price nil and currency nil' do
+          before do
+            variant.price = nil
+            variant.send(:check_price)
+          end
+
+          it { expect(variant.price).to eq(variant.product.master.price) }
+          it { expect(variant.currency).to eq(Spree::Config[:currency]) }
+        end
+      end
+
+      context 'product not present' do
+        context 'product not present' do
+          before { variant.product = nil }
+
+          context 'price nil and currency present' do
+            before { variant.price = nil }
+
+            it { expect { variant.send(:check_price) }.to raise_error(RuntimeError, 'No master variant found to infer price') }
+          end
+
+          context 'price nil and currency nil' do
+            before { variant.price = nil }
+
+            it { expect { variant.send(:check_price) }.to raise_error(RuntimeError, 'No master variant found to infer price') }
+          end
+        end
+      end
+    end
+  end
+
+  describe '#created_at' do
+    it 'creates variant with created_at timestamp' do
+      expect(variant.created_at).to_not be_nil
+    end
+  end
+
+  describe '#updated_at' do
+    it 'creates variant with updated_at timestamp' do
+      expect(variant.updated_at).to_not be_nil
     end
   end
 end

@@ -62,11 +62,11 @@ API docs should look like:
 
     ### Input (request json body)
 
-    <%= json :field => "sample value" %>
+    <%= json field: "sample value" %>
 
     ### Response
 
-    <%= headers 200, :pagination => true, 'X-Custom-Header' => "value" %>
+    <%= headers 200, pagination: true, 'X-Custom-Header' => "value" %>
     <%= json :resource_name %>
 
 **Note**: We're using [Kramdown Markdown extensions](http://kramdown.gettalong.org/syntax.html), such as definition lists.
@@ -188,12 +188,6 @@ One thing: remember to add trailing slashes to all nanoc links!
 Set `EDGE_GUIDES=true` in an environment variable in order to generate the "edge" badge. You may need to remove any previously generated output for the change to take effect
 
     $ EDGE_GUIDES=true nanoc autocompile
-
-## Deploy
-
-The guides can no longer be deployed to production from this
-repo. Sufficiently-privileged users should see the private repo
-[guides_deploy](https://github.com/spree/guides_deploy).
 
 ## TODO
 

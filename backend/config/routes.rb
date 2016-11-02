@@ -1,8 +1,5 @@
 Spree::Core::Engine.add_routes do
   namespace :admin, path: Spree.admin_path do
-    get '/search/users', to: "search#users", as: :search_users
-    get '/search/products', to: "search#products", as: :search_products
-
     resources :promotions do
       resources :promotion_rules
       resources :promotion_actions
@@ -30,7 +27,7 @@ Spree::Core::Engine.add_routes do
         end
       end
       member do
-        get :clone
+        post :clone
         get :stock
       end
       resources :variants do
@@ -40,8 +37,6 @@ Spree::Core::Engine.add_routes do
       end
       resources :variants_including_master, only: [:update]
     end
-
-    get '/variants/search', to: "variants#search", as: :search_variants
 
     resources :option_types do
       collection do
@@ -112,6 +107,9 @@ Spree::Core::Engine.add_routes do
       end
     end
 
+    get '/return_authorizations', to: "return_index#return_authorizations", as: :return_authorizations
+    get '/customer_returns', to: "return_index#customer_returns", as: :customer_returns
+
     resource :general_settings do
       collection do
         post :clear_cache
@@ -127,11 +125,7 @@ Spree::Core::Engine.add_routes do
       resources :taxons
     end
 
-    resources :taxons, only: [:index, :show] do
-      collection do
-        get :search
-      end
-    end
+    resources :taxons, only: [:index, :show]
 
     resources :reports, only: [:index] do
       collection do
@@ -140,9 +134,9 @@ Spree::Core::Engine.add_routes do
       end
     end
 
-    resources :reimbursement_types, only: [:index]
-    resources :refund_reasons, except: [:show, :destroy]
-    resources :return_authorization_reasons, except: [:show, :destroy]
+    resources :reimbursement_types
+    resources :refund_reasons, except: :show
+    resources :return_authorization_reasons, except: :show
 
     resources :shipping_methods
     resources :shipping_categories
@@ -155,8 +149,8 @@ Spree::Core::Engine.add_routes do
     end
 
     resources :stock_items, only: [:create, :update, :destroy]
+    resources :store_credit_categories
     resources :tax_rates
-
     resources :trackers
     resources :payment_methods do
       collection do
@@ -174,8 +168,9 @@ Spree::Core::Engine.add_routes do
         get :items
         get :orders
       end
+      resources :store_credits
     end
   end
 
-  get Spree.admin_path, to: 'admin/root#index', as: :admin
+  get Spree.admin_path, to: redirect(Spree.admin_path + '/orders'), as: :admin
 end

@@ -1,12 +1,16 @@
 $(document).ready(function () {
   'use strict';
 
+  function formatOptionType(option_type) {
+    return Select2.util.escapeMarkup(option_type.presentation + ' (' + option_type.name + ')');
+  }
+
   if ($('#product_option_type_ids').length > 0) {
     $('#product_option_type_ids').select2({
       placeholder: Spree.translations.option_type_placeholder,
       multiple: true,
       initSelection: function (element, callback) {
-        var url = Spree.url(Spree.routes.option_type_search, {
+        var url = Spree.url(Spree.routes.option_types_api, {
           ids: element.val(),
           token: Spree.api_key
         });
@@ -15,7 +19,7 @@ $(document).ready(function () {
         });
       },
       ajax: {
-        url: Spree.routes.option_type_search,
+        url: Spree.routes.option_types_api,
         quietMillis: 200,
         datatype: 'json',
         data: function (term) {
@@ -32,12 +36,8 @@ $(document).ready(function () {
           };
         }
       },
-      formatResult: function (option_type) {
-        return option_type.presentation + ' (' + option_type.name + ')';
-      },
-      formatSelection: function (option_type) {
-        return option_type.presentation + ' (' + option_type.name + ')';
-      }
+      formatResult: formatOptionType,
+      formatSelection: formatOptionType
     });
   }
 });

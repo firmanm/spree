@@ -1,10 +1,11 @@
 <% content_for :page_title do %>
-  <%= Spree.t(:editing_resource, resource: Spree::PromotionCategory.model_name.human) %>
+  <%= link_to Spree.t(:promotion_categories), spree.admin_promotion_categories_url %> /
+  <%= @promotion_category.name %>
 <% end %>
 
-<%= form_for @promotion_category, :url => object_url, :method => :put do |f| %>
+<%= form_for @promotion_category, url: object_url, method: :put do |f| %>
   <fieldset>
-    <%= render :partial => 'form', :locals => { :f => f } %>
-    <%= render :partial => 'spree/admin/shared/edit_resource_links' %>
+    <%= render partial: 'form', locals: { f: f } %>
+    <%= render partial: 'spree/admin/shared/edit_resource_links' %>
   </fieldset>
 <% end %>

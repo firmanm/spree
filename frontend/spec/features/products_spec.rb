@@ -20,6 +20,23 @@ describe "Visiting Products", type: :feature, inaccessible: true do
     expect(page).to have_content("Shopping Cart")
   end
 
+  describe "correct displaying of microdata" do
+    let(:products) { Spree::TestingSupport::Microdata::Document.new(page.body).extract_items }
+    let(:ringer) { products.keep_if { |product| product.properties["name"].first.match("Ringer") }.first }
+
+    it "correctly displays the product name via microdata" do
+      expect(ringer.properties["name"]).to eq ["Ruby on Rails Ringer T-Shirt"]
+    end
+
+    it "correctly displays the product image via microdata" do
+      expect(ringer.properties['image'].first).to include '/assets/noimage/small'
+    end
+
+    it "correctly displays the product url via microdata" do
+      expect(ringer.properties["url"]).to eq ["/products/ruby-on-rails-ringer-t-shirt"]
+    end
+  end
+
   describe 'meta tags and title' do
     let(:jersey) { Spree::Product.find_by_name('Ruby on Rails Baseball Jersey') }
     let(:metas) { { meta_description: 'Brand new Ruby on Rails Jersey', meta_title: 'Ruby on Rails Baseball Jersey Buy High Quality Geek Apparel', meta_keywords: 'ror, jersey, ruby' } }
@@ -124,16 +141,17 @@ describe "Visiting Products", type: :feature, inaccessible: true do
   context "a product with variants" do
     let(:product) { Spree::Product.find_by_name("Ruby on Rails Baseball Jersey") }
     let(:option_value) { create(:option_value) }
-    let!(:variant) { product.variants.create!(:price => 5.59) }
+    let!(:variant) { build(:variant, price: 5.59, product: product, option_values: []) }
 
     before do
       # Need to have two images to trigger the error
       image = File.open(File.expand_path('../../fixtures/thinking-cat.jpg', __FILE__))
-      product.images.create!(:attachment => image)
-      product.images.create!(:attachment => image)
+      product.images.create!(attachment: image)
+      product.images.create!(attachment: image)
 
       product.option_types << option_value.option_type
       variant.option_values << option_value
+      variant.save!
     end
 
     it "should be displayed" do
@@ -156,22 +174,76 @@ describe "Visiting Products", type: :feature, inaccessible: true do
         expect(page).not_to have_content Spree.t(:out_of_stock)
       end
     end
+
+    it "doesn't display cart form if all variants (including master) are out of stock" do
+      product.variants_including_master.each { |v| v.stock_items.update_all count_on_hand: 0, backorderable: false }
+
+      click_link product.name
+      within("[data-hook=product_price]") do
+        expect(page).not_to have_content Spree.t(:add_to_cart)
+      end
+    end
   end
 
   context "a product with variants, images only for the variants" do
     let(:product) { Spree::Product.find_by_name("Ruby on Rails Baseball Jersey") }
+    let(:variant1) { create(:variant, product: product, price: 9.99) }
+    let(:variant2) { create(:variant, product: product, price: 10.99) }
 
     before do
       image = File.open(File.expand_path('../../fixtures/thinking-cat.jpg', __FILE__))
-      v1 = product.variants.create!(price: 9.99)
-      v2 = product.variants.create!(price: 10.99)
-      v1.images.create!(attachment: image)
-      v2.images.create!(attachment: image)
+      variant1.images.create!(attachment: image)
+      variant2.images.create!(attachment: image)
     end
 
     it "should not display no image available" do
       visit spree.root_path
       expect(page).to have_xpath("//img[contains(@src,'thinking-cat')]")
+    end
+  end
+
+  context "an out of stock product without variants" do
+    let(:product) { Spree::Product.find_by_name("Ruby on Rails Tote") }
+
+    before do
+      product.master.stock_items.update_all count_on_hand: 0, backorderable: false
+    end
+
+    it "does display out of stock for master product" do
+      click_link product.name
+      within("#product-price") do
+        expect(page).to have_content Spree.t(:out_of_stock)
+      end
+    end
+
+    it "doesn't display cart form if master is out of stock" do
+      click_link product.name
+      within("[data-hook=product_price]") do
+        expect(page).not_to have_content Spree.t(:add_to_cart)
+      end
+    end
+  end
+
+  context 'product with taxons' do
+    let(:product) { Spree::Product.find_by_name("Ruby on Rails Tote") }
+    let(:taxon) { product.taxons.first }
+
+    it 'displays breadcrumbs for the default taxon when none selected' do
+      click_link product.name
+      within("#breadcrumbs") do
+        expect(page).to have_content taxon.name
+      end
+    end
+
+    it 'displays selected taxon in breadcrumbs' do
+      taxon = Spree::Taxon.last
+      product.taxons << taxon
+      product.save!
+      visit '/t/' + taxon.to_param
+      click_link product.name
+      within("#breadcrumbs") do
+        expect(page).to have_content taxon.name
+      end
     end
   end
 
@@ -209,11 +281,11 @@ describe "Visiting Products", type: :feature, inaccessible: true do
     within(:css, '#sidebar_products_search') { click_button "Search" }
 
     expect(page.all('#products .product-list-item').size).to eq(2)
-    products = page.all('#products .product-list-item a[itemprop=name]')
+    products = page.all('#products .product-list-item span[itemprop=name]')
     expect(products.count).to eq(2)
 
     find('.pagination .next a').click
-    products = page.all('#products .product-list-item a[itemprop=name]')
+    products = page.all('#products .product-list-item span[itemprop=name]')
     expect(products.count).to eq(1)
   end
 
@@ -233,7 +305,7 @@ describe "Visiting Products", type: :feature, inaccessible: true do
   end
 
   it "should be able to put a product without a description in the cart" do
-    product = FactoryGirl.create(:base_product, :description => nil, :name => 'Sample', :price => '19.99')
+    product = FactoryGirl.create(:base_product, description: nil, name: 'Sample', price: '19.99')
     visit spree.product_path(product)
     expect(page).to have_content "This product has no description"
     click_button 'add-to-cart-button'
@@ -241,7 +313,7 @@ describe "Visiting Products", type: :feature, inaccessible: true do
   end
 
   it "shouldn't be able to put a product without a current price in the cart" do
-    product = FactoryGirl.create(:base_product, :description => nil, :name => 'Sample', :price => '19.99')
+    product = FactoryGirl.create(:base_product, description: nil, name: 'Sample', price: '19.99')
     Spree::Config.currency = "CAN"
     Spree::Config.show_products_without_price = true
     visit spree.product_path(product)

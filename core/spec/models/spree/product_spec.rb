@@ -9,15 +9,42 @@ module ThirdParty
   end
 end
 
-describe Spree::Product, :type => :model do
+describe Spree::Product, type: :model do
+
+  describe 'Associations' do
+    it 'should have many promotions' do
+      is_expected.to have_many(:promotions).
+        class_name('Spree::Promotion').through(:promotion_rules)
+    end
+
+    it 'should have many possible_promotions' do
+      is_expected.to have_many(:possible_promotions).
+        class_name('Spree::Promotion').through(:promotion_rules).source(:promotion)
+    end
+
+    it do
+      is_expected.to have_many(:variants).
+        class_name('Spree::Variant').
+        inverse_of(:product).
+        conditions(is_master: false).
+        order(:position)
+    end
+
+    it do
+      is_expected.to have_many(:variants_including_master).
+        class_name('Spree::Variant').
+        inverse_of(:product).
+        order(:position)
+    end
+  end
 
   context 'product instance' do
     let(:product) { create(:product) }
-    let(:variant) { create(:variant, :product => product) }
+    let(:variant) { create(:variant, product: product) }
 
     context '#duplicate' do
       before do
-        allow(product).to receive_messages :taxons => [create(:taxon)]
+        allow(product).to receive_messages taxons: [create(:taxon)]
       end
 
       it 'duplicates product' do
@@ -88,7 +115,7 @@ describe Spree::Product, :type => :model do
 
     context "product has variants" do
       before do
-        create(:variant, :product => product)
+        create(:variant, product: product)
       end
 
       context "#destroy" do
@@ -148,6 +175,17 @@ describe Spree::Product, :type => :model do
       end
     end
 
+    context "#can_supply?" do
+      it "should be true" do
+        expect(product.can_supply?).to be(true)
+      end
+
+      it "should be false" do
+        product.variants_including_master.each { |v| v.stock_items.update_all count_on_hand: 0, backorderable: false }
+        expect(product.can_supply?).to be(false)
+      end
+    end
+
     context "variants_and_option_values" do
       let!(:high) { create(:variant, product: product) }
       let!(:low) { create(:variant, product: product) }
@@ -156,22 +194,6 @@ describe Spree::Product, :type => :model do
 
       it "returns only variants with option values" do
         expect(product.variants_and_option_values).to eq([low])
-      end
-    end
-
-    describe 'Variants sorting' do
-      ORDER_REGEXP = /ORDER BY (\`|\")spree_variants(\`|\").(\'|\")position(\'|\") ASC/
-
-      context 'without master variant' do
-        it 'sorts variants by position' do
-          expect(product.variants.to_sql).to match(ORDER_REGEXP)
-        end
-      end
-
-      context 'with master variant' do
-        it 'sorts variants by position' do
-          expect(product.variants_including_master.to_sql).to match(ORDER_REGEXP)
-        end
       end
     end
 
@@ -199,6 +221,16 @@ describe Spree::Product, :type => :model do
         product.slug = "hey//joe"
         product.valid?
         expect(product.slug).not_to match "/"
+      end
+
+      it "stores old slugs in FriendlyIds history" do
+        # create_slug is a private method, included by FriendlyId::History
+        # it's effect is rather complex and dependent on state and config.
+        # However, when a new slug is set, it should call slugs.create!
+        expect(product.slugs).to receive(:create!)
+        # Set it, otherwise the create_slug method avoids writing a new one
+        product.slug = "custom-slug"
+        product.run_callbacks :save
       end
 
       context "when product destroyed" do
@@ -243,6 +275,40 @@ describe Spree::Product, :type => :model do
         product2.save!
 
         expect(product2.slug).to eq 'test-456'
+      end
+    end
+
+    describe "#discontinue_on_must_be_later_than_available_on" do
+      before { product.available_on = Date.today }
+
+      context "available_on is a date earlier than discontinue_on" do
+        before { product.discontinue_on = 5.days.from_now }
+
+        it "is valid" do
+          expect(product).to be_valid
+        end
+      end
+
+      context "available_on is a date earlier than discontinue_on" do
+        before { product.discontinue_on = 5.days.ago }
+
+        context "is not valid" do
+          before { product.valid? }
+
+          it { expect(product).not_to be_valid }
+          it { expect(product.errors[:discontinue_on]).to include(I18n.t(:invalid_date_range, scope: 'activerecord.errors.models.spree/product.attributes.discontinue_on')) }
+        end
+      end
+
+      context "available_on and discontinue_on are nil" do
+        before do
+          product.discontinue_on = nil
+          product.available_on = nil
+        end
+
+        it "is valid" do
+          expect(product).to be_valid
+        end
       end
     end
 
@@ -318,27 +384,29 @@ describe Spree::Product, :type => :model do
 
     # Regression test for #2455
     it "should not overwrite properties' presentation names" do
-      Spree::Property.where(:name => 'foo').first_or_create!(:presentation => "Foo's Presentation Name")
+      Spree::Property.where(name: 'foo').first_or_create!(presentation: "Foo's Presentation Name")
       product.set_property('foo', 'value1')
       product.set_property('bar', 'value2')
-      expect(Spree::Property.where(:name => 'foo').first.presentation).to eq("Foo's Presentation Name")
-      expect(Spree::Property.where(:name => 'bar').first.presentation).to eq("bar")
+      expect(Spree::Property.where(name: 'foo').first.presentation).to eq("Foo's Presentation Name")
+      expect(Spree::Property.where(name: 'bar').first.presentation).to eq("bar")
     end
 
     # Regression test for #4416
     context "#possible_promotions" do
-      let!(:promotion) do
-        create(:promotion, advertise: true, starts_at: 1.day.ago)
-      end
-      let!(:rule) do
-        Spree::Promotion::Rules::Product.create(
-          promotion: promotion,
-          products: [product]
-        )
+      let!(:possible_promotion) { create(:promotion, advertise: true, starts_at: 1.day.ago) }
+      let!(:unadvertised_promotion) { create(:promotion, advertise: false, starts_at: 1.day.ago) }
+      let!(:inactive_promotion) { create(:promotion, advertise: true, starts_at: 1.day.since) }
+
+      before do
+        product.promotion_rules.create!(promotion: possible_promotion)
+        product.promotion_rules.create!(promotion: unadvertised_promotion)
+        product.promotion_rules.create!(promotion: inactive_promotion)
       end
 
       it "lists the promotion as a possible promotion" do
-        expect(product.possible_promotions).to include(promotion)
+        expect(product.possible_promotions).to include(possible_promotion)
+        expect(product.possible_promotions).to_not include(unadvertised_promotion)
+        expect(product.possible_promotions).to_not include(inactive_promotion)
       end
     end
   end
@@ -365,7 +433,7 @@ describe Spree::Product, :type => :model do
 
       let(:prototype) do
         size = build_option_type_with_values("size", %w(Small Medium Large))
-        create(:prototype, :name => "Size", :option_types => [ size ])
+        create(:prototype, name: "Size", option_types: [ size ])
       end
 
       let(:option_values_hash) do
@@ -397,6 +465,7 @@ describe Spree::Product, :type => :model do
         product.option_values_hash = option_values_hash
         product.prototype_id = nil
         product.save
+        product.reload
         expect(product.option_type_ids.length).to eq(1)
         expect(product.option_type_ids).to eq(prototype.option_type_ids)
         expect(product.variants.length).to eq(3)
@@ -419,12 +488,12 @@ describe Spree::Product, :type => :model do
   context "#images" do
     let(:product) { create(:product) }
     let(:image) { File.open(File.expand_path('../../../fixtures/thinking-cat.jpg', __FILE__)) }
-    let(:params) { {:viewable_id => product.master.id, :viewable_type => 'Spree::Variant', :attachment => image, :alt => "position 2", :position => 2} }
+    let(:params) { {viewable_id: product.master.id, viewable_type: 'Spree::Variant', attachment: image, alt: "position 2", position: 2} }
 
     before do
       Spree::Image.create(params)
-      Spree::Image.create(params.merge({:alt => "position 1", :position => 1}))
-      Spree::Image.create(params.merge({:viewable_type => 'ThirdParty::Extension', :alt => "position 1", :position => 2}))
+      Spree::Image.create(params.merge({alt: "position 1", position: 1}))
+      Spree::Image.create(params.merge({viewable_type: 'ThirdParty::Extension', alt: "position 1", position: 2}))
     end
 
     it "only looks for variant images" do
@@ -454,17 +523,17 @@ describe Spree::Product, :type => :model do
 
     it 'should be infinite if track_inventory_levels is false' do
       Spree::Config[:track_inventory_levels] = false
-      expect(build(:product, :variants_including_master => [build(:master_variant)]).total_on_hand).to eql(Float::INFINITY)
+      expect(build(:product, variants_including_master: [build(:master_variant)]).total_on_hand).to eql(Float::INFINITY)
     end
 
     it 'should be infinite if variant is on demand' do
       Spree::Config[:track_inventory_levels] = true
-      expect(build(:product, :variants_including_master => [build(:on_demand_master_variant)]).total_on_hand).to eql(Float::INFINITY)
+      expect(build(:product, variants_including_master: [build(:on_demand_master_variant)]).total_on_hand).to eql(Float::INFINITY)
     end
 
     it 'should return sum of stock items count_on_hand' do
       product.stock_items.first.set_count_on_hand 5
-      product.variants_including_master(true) # force load association
+      product.variants_including_master.reload # force load association
       expect(product.total_on_hand).to eql(5)
     end
 
@@ -496,6 +565,12 @@ describe Spree::Product, :type => :model do
       product.reload
       expect(product.discontinued?).to be(true)
     end
+
+    it "changes updated_at" do
+      Timecop.scale(1000) do
+        expect { product.discontinue! }.to change { product.updated_at }
+      end
+    end
   end
 
   context "#discontinued?" do
@@ -507,6 +582,20 @@ describe Spree::Product, :type => :model do
     let(:product_discontinued) { build(:product, sku: "a-sku", discontinue_on: Time.now - 1.day)  }
     it "should be true" do
       expect(product_discontinued.discontinued?).to be(true)
+    end
+  end
+
+  context "acts_as_taggable" do
+    let(:product) { create(:product) }
+
+    it "should add tags" do
+      product.tag_list.add("awesome")
+      expect(product.tag_list).to include("awesome")
+    end
+
+    it "should remove tags" do
+      product.tag_list.remove("awesome")
+      expect(product.tag_list).to_not include("awesome")
     end
   end
 end

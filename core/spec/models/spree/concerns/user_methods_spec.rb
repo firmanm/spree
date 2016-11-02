@@ -3,6 +3,20 @@ require 'spec_helper'
 describe Spree::UserMethods do
   let(:test_user) { create :user }
 
+  describe 'Associations' do
+    subject { test_user }
+
+    it 'should have many promotion_rule_users' do
+      is_expected.to have_many(:promotion_rule_users).with_foreign_key(:user_id).
+        class_name('Spree::PromotionRuleUser').dependent(:destroy)
+    end
+
+    it 'should have many role_users' do
+      is_expected.to have_many(:role_users).class_name('Spree::RoleUser').
+        with_foreign_key(:user_id).dependent(:destroy)
+    end
+  end
+
   describe '#has_spree_role?' do
     subject { test_user.has_spree_role? name }
 
@@ -36,6 +50,33 @@ describe Spree::UserMethods do
 
     context 'without an incomplete order' do
       it { is_expected.to be_nil }
+    end
+  end
+
+  context '#check_completed_orders' do
+    let(:possible_promotion) { create(:promotion, advertise: true, starts_at: 1.day.ago) }
+    context 'rstrict t delete dependent destroyed' do
+      before do
+        test_user.promotion_rules.create!(promotion: possible_promotion)
+        create(:order, user: test_user, completed_at: Time.current)
+      end
+
+      it 'should not destroy dependent destroy items' do
+        expect { test_user.destroy }.to raise_error(Spree::Core::DestroyWithOrdersError)
+        expect(test_user.promotion_rule_users.any?).to be(true)
+      end
+    end
+
+    context 'allow to destroy dependent destroy' do
+      before do
+        test_user.promotion_rules.create!(promotion: possible_promotion)
+        create(:order, user: test_user, created_at: 1.day.ago)
+        test_user.destroy
+      end
+
+      it 'should not destroy dependent destroy items' do
+        expect(test_user.promotion_rule_users.any?).to be(false)
+      end
     end
   end
 end

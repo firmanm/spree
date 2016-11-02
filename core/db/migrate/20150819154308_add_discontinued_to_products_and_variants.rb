@@ -1,4 +1,4 @@
-class AddDiscontinuedToProductsAndVariants < ActiveRecord::Migration
+class AddDiscontinuedToProductsAndVariants < ActiveRecord::Migration[4.2]
   def up
     add_column :spree_products, :discontinue_on, :datetime, after: :available_on
     add_column :spree_variants, :discontinue_on, :datetime, after: :deleted_at
@@ -30,7 +30,7 @@ We will print out a report of the data we are fixing now: "
         end
       else
         puts "leaving product id #{product.id} deleted because there is a duplicate slug for '#{product.slug}' (product id #{the_dup.id}) "
-        if variants.map(&:line_items).any?
+        if product.variants.map(&:line_items).any?
           puts "WARNING: You may still have bugs with product id #{product.id} (#{product.name}) until you run rake db:fix_orphan_line_items"
         end
       end

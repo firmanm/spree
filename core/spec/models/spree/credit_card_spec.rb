@@ -19,7 +19,7 @@ describe Spree::CreditCard, type: :model do
   before(:each) do
 
     @order = create(:order)
-    @payment = Spree::Payment.create(:amount => 100, :order => @order)
+    @payment = Spree::Payment.create(amount: 100, order: @order)
 
     @success_response = double('gateway_response', success?: true, authorization: '123', avs_result: { 'code' => 'avs-code' })
     @fail_response = double('gateway_response', success?: false)
@@ -219,6 +219,10 @@ describe Spree::CreditCard, type: :model do
       expect(credit_card.cc_type).to eq('visa')
 
       credit_card.number = '5555555555554444'
+      credit_card.cc_type = ''
+      expect(credit_card.cc_type).to eq('master')
+
+      credit_card.number = '2223000010309703'
       credit_card.cc_type = ''
       expect(credit_card.cc_type).to eq('master')
 

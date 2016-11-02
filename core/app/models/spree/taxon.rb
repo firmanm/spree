@@ -4,7 +4,7 @@ require 'stringex'
 module Spree
   class Taxon < Spree::Base
     extend FriendlyId
-    friendly_id :permalink, slug_column: :permalink, use: :slugged
+    friendly_id :permalink, slug_column: :permalink, use: :history
     before_create :set_permalink
 
     acts_as_nested_set dependent: :destroy
@@ -13,10 +13,10 @@ module Spree
     has_many :classifications, -> { order(:position) }, dependent: :delete_all, inverse_of: :taxon
     has_many :products, through: :classifications
 
-    has_many :prototype_taxons, class_name: 'Spree::PrototypeTaxon'
+    has_many :prototype_taxons, class_name: 'Spree::PrototypeTaxon', dependent: :destroy
     has_many :prototypes, through: :prototype_taxons, class_name: 'Spree::Prototype'
 
-    has_many :promotion_rule_taxons, class_name: 'Spree::PromotionRuleTaxon'
+    has_many :promotion_rule_taxons, class_name: 'Spree::PromotionRuleTaxon', dependent: :destroy
     has_many :promotion_rules, through: :promotion_rule_taxons, class_name: 'Spree::PromotionRule'
 
     validates :name, presence: true
@@ -94,7 +94,7 @@ module Spree
 
     def touch_ancestors_and_taxonomy
       # Touches all ancestors at once to avoid recursive taxonomy touch, and reduce queries.
-      self.class.where(id: ancestors.pluck(:id)).update_all(updated_at: Time.current)
+      ancestors.update_all(updated_at: Time.current)
       # Have taxonomy touch happen in #touch_ancestors_and_taxonomy rather than association option in order for imports to override.
       taxonomy.try!(:touch)
     end

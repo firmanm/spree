@@ -1,6 +1,8 @@
 module Spree
   class Tracker < Spree::Base
-    before_save :clear_cache
+    after_commit :clear_cache
+
+    validates :analytics_id, presence: true, uniqueness: { allow_blank: true }
 
     def self.current
       tracker = Rails.cache.fetch("current_tracker") do

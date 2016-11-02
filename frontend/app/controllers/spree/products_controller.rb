@@ -3,7 +3,7 @@ module Spree
     before_action :load_product, only: :show
     before_action :load_taxon, only: :index
 
-    rescue_from ActiveRecord::RecordNotFound, :with => :render_404
+    rescue_from ActiveRecord::RecordNotFound, with: :render_404
     helper 'spree/taxons'
 
     respond_to :html
@@ -11,6 +11,7 @@ module Spree
     def index
       @searcher = build_searcher(params.merge(include_images: true))
       @products = @searcher.retrieve_products
+      @products = @products.includes(:possible_promotions) if @products.respond_to?(:includes)
       @taxonomies = Spree::Taxonomy.includes(root: :children)
     end
 
@@ -20,7 +21,7 @@ module Spree
                            active(current_currency).
                            includes([:option_values, :images])
       @product_properties = @product.product_properties.includes(:property)
-      @taxon = Spree::Taxon.find(params[:taxon_id]) if params[:taxon_id]
+      @taxon = params[:taxon_id].present? ? Spree::Taxon.find(params[:taxon_id]) : @product.taxons.first
       redirect_if_legacy_path
     end
 
@@ -40,7 +41,7 @@ module Spree
         else
           @products = Product.active(current_currency)
         end
-        @product = @products.includes(:variants_including_master).friendly.find(params[:id])
+        @product = @products.includes(:variants_including_master, variant_images: :viewable).friendly.find(params[:id])
       end
 
       def load_taxon
@@ -51,7 +52,8 @@ module Spree
         # If an old id or a numeric id was used to find the record,
         # we should do a 301 redirect that uses the current friendly id.
         if params[:id] != @product.friendly_id
-          params.merge!(id: @product.friendly_id)
+          params[:id] = @product.friendly_id
+          params.permit!
           return redirect_to url_for(params), status: :moved_permanently
         end
       end

@@ -65,7 +65,7 @@ if user.respond_to?(:has_spree_role?) && user.has_spree_role?('admin')
   can :manage, :all
 else
   #############################
-  can [:read,:update,:destroy], Spree.user_class, :id => user.id
+  can [:read,:update,:destroy], Spree.user_class, id: user.id
   can :create, Spree.user_class
   #############################
   can :read, Order do |order, token|
@@ -176,7 +176,6 @@ module Spree
       def index
         # Relevant code in here
       end
-
     private
       def model_class
         Widget
@@ -189,6 +188,35 @@ end
 This is necessary because CanCan cannot, by default, detect the model used to
 authorize controllers under the Admin namespace. By specifying `model_class`, Spree
 knows what to tell CanCan to use to authorize your controller.
+
+
+If you inherit from `ResourceController` instead of directly `BaseController`, and if you define new
+collection actions, you need to override  `ResourceController#collection_actions` which contains only `[:index]` by default.
+
+
+```ruby
+module Spree
+  module Admin
+    class WidgetsController < ResourceController
+      def index
+        # Relevant code in here
+      end
+
+     def new_coll_action
+        # relevant code
+     end
+
+    def collection_actions
+        [:index, :new_coll_action]
+    end
+    private
+      def model_class
+        Widget
+      end
+    end
+  end
+end
+```
 
 ### Tokenized Permissions
 
@@ -204,8 +232,8 @@ module Spree
     module TokenResource
       module ClassMethods
         def token_resource
-          has_one :tokenized_permission, :as => :permissable
-          delegate :token, :to => :tokenized_permission, :allow_nil => true
+          has_one :tokenized_permission, as: :permissable
+          delegate :token, to: :tokenized_permission, allow_nil: true
           after_create :create_token
         end
       end

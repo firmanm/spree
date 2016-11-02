@@ -1,10 +1,9 @@
 module SpreeCmd
-
   class Extension < Thor::Group
     include Thor::Actions
 
     desc "builds a spree extension"
-    argument :file_name, :type => :string, :desc => 'rails app_path', :default => '.'
+    argument :file_name, type: :string, desc: 'rails app_path', default: '.'
 
     source_root File.expand_path('../templates/extension', __FILE__)
 
@@ -30,15 +29,13 @@ module SpreeCmd
     end
 
     def final_banner
-      say %Q{
+      say %{
         #{'*' * 80}
 
         Your extension has been generated with a gemspec dependency on Spree #{spree_version}.
 
         For more information on the versioning of Spree.
         See https://guides.spreecommerce.com/developer/extensions_tutorial.html#versioning-your-extension
-
-        Consider listing your extension in the official extension registry https://spreecommerce.com/extensions
 
         #{'*' * 80}
       }
@@ -50,7 +47,7 @@ module SpreeCmd
       end
 
       def spree_version
-        '3.1.0.beta'
+        Gem.loaded_specs['spree_cmd'].version.to_s
       end
 
       def use_prefix(prefix)
@@ -59,6 +56,5 @@ module SpreeCmd
         end
       end
     end
-
   end
 end

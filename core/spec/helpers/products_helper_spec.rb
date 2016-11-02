@@ -3,7 +3,7 @@
 require "spec_helper"
 
 module Spree
-  describe ProductsHelper, :type => :helper do
+  describe ProductsHelper, type: :helper do
     include ProductsHelper
 
     let(:product) { create(:product) }
@@ -18,7 +18,7 @@ module Spree
       let(:variant_price) { 10 }
 
       before do
-        @variant = create(:variant, :product => product)
+        @variant = create(:variant, product: product)
         product.price = 15
         @variant.price = 10
         allow(product).to receive(:amount_in) { product_price }
@@ -75,8 +75,8 @@ module Spree
     context "#variant_price_full" do
       before do
         Spree::Config[:show_variant_full_price] = true
-        @variant1 = create(:variant, :product => product)
-        @variant2 = create(:variant, :product => product)
+        @variant1 = create(:variant, product: product)
+        @variant2 = create(:variant, product: product)
       end
 
       context "when currency is default" do
@@ -158,6 +158,10 @@ THIS IS THE BEST PRODUCT EVER!
         expect(description).to eq(initialDescription)
       end
 
+      context "renders a product description default description incase description is blank" do
+        before { product.description = '' }
+        it { expect(product_description(product)).to eq(Spree.t(:product_has_no_description)) }
+      end
     end
 
     shared_examples_for "line item descriptions" do
@@ -179,13 +183,6 @@ THIS IS THE BEST PRODUCT EVER!
       end
     end
 
-    context "#line_item_description" do
-      let(:variant) { create(:variant, :product => product, description: description) }
-      subject { line_item_description_text(variant.product.description) }
-
-      it_should_behave_like "line item descriptions"
-    end
-
     context '#line_item_description_text' do
       subject { line_item_description_text description }
 
@@ -199,7 +196,7 @@ THIS IS THE BEST PRODUCT EVER!
       subject { helper.cache_key_for_products }
       before(:each) do
         @products = double('products collection')
-        allow(helper).to receive(:params) { {:page => 10} }
+        allow(helper).to receive(:params) { {page: 10} }
         allow(helper).to receive(:current_price_options) { price_options }
       end
 

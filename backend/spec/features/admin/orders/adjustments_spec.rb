@@ -13,11 +13,11 @@ describe "Adjustments", type: :feature do
 
   let!(:tax_adjustment) do
     create(:tax_adjustment,
-      :adjustable => line_item,
-      :state => 'closed',
-      :order => order,
-      :label => "VAT 5%",
-      :amount => 10)
+      adjustable: line_item,
+      state: 'closed',
+      order: order,
+      label: "VAT 5%",
+      amount: 10)
   end
 
   let!(:adjustment) { order.adjustments.create!(order: order, label: 'Rebate', amount: 10) }
@@ -62,7 +62,7 @@ describe "Adjustments", type: :feature do
         fill_in "adjustment_label", with: "rebate"
         click_button "Continue"
         expect(page).to have_content("successfully created!")
-        expect(page).to have_content("Total: $180.00")
+        expect(page).to have_content("Total: $80.00")
       end
     end
 
@@ -94,7 +94,7 @@ describe "Adjustments", type: :feature do
           expect(page).to have_content("$99.00")
         end
 
-        expect(page).to have_content("Total: $259.00")
+        expect(page).to have_content("Total: $159.00")
       end
     end
 

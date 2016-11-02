@@ -15,9 +15,9 @@ module Spree
 
     before_action :associate_user
     before_action :check_authorization
-    before_action :apply_coupon_code
 
     before_action :setup_for_current_state
+    before_action :add_store_credit_payments, only: [:update]
 
     helper 'spree/orders'
 
@@ -71,7 +71,7 @@ module Spree
     def ensure_valid_state
       if @order.state != correct_state && !skip_state_validation?
         flash.keep
-        @order.state = correct_state
+        @order.update_column(:state, correct_state)
         redirect_to checkout_state_path(@order.state)
       end
     end
@@ -163,6 +163,21 @@ module Spree
       end
     end
 
+    def add_store_credit_payments
+      if params.has_key?(:apply_store_credit)
+        @order.add_store_credit_payments
+
+        # Remove other payment method parameters.
+        params[:order].delete(:payments_attributes)
+        params.delete(:payment_source)
+
+        # Return to the Payments page if additional payment is needed.
+        if @order.payments.valid.sum(:amount) < @order.total
+          redirect_to checkout_state_path(@order.state) and return
+        end
+      end
+    end
+
     def rescue_from_spree_gateway_error(exception)
       flash.now[:error] = Spree.t(:spree_gateway_error_flash_for_checkout)
       @order.errors.add(:base, exception.message)
@@ -171,18 +186,6 @@ module Spree
 
     def check_authorization
       authorize!(:edit, current_order, cookies.signed[:guest_token])
-    end
-
-    def sanitize_zip_code
-      order_params = params[:order]
-      return unless order_params
-      strip_zip(order_params[:bill_address_attributes])
-      strip_zip(order_params[:ship_address_attributes])
-    end
-
-    def strip_zip(address_params)
-      return unless address_params
-      address_params[:zipcode] = address_params[:zipcode].strip if address_params[:zipcode]
     end
   end
 end

@@ -1,12 +1,14 @@
 require 'spec_helper'
+require 'spree/testing_support/url_helpers'
 
 class FakesController < ApplicationController
   include Spree::Core::ControllerHelpers::Auth
-  def index; render text: 'index'; end
+  def index; render plain: 'index'; end
 end
 
 describe Spree::Core::ControllerHelpers::Auth, type: :controller do
   controller(FakesController) {}
+  include Spree::TestingSupport::UrlHelpers
 
   describe '#current_ability' do
     it 'returns Spree::Ability instance' do
@@ -38,7 +40,7 @@ describe Spree::Core::ControllerHelpers::Auth, type: :controller do
     controller(FakesController) do
       def index
         set_guest_token
-        render text: 'index'
+        render plain: 'index'
       end
     end
     it 'sends cookie header' do
@@ -77,9 +79,9 @@ describe Spree::Core::ControllerHelpers::Auth, type: :controller do
       before do
         allow(controller).to receive_messages(try_spree_current_user: double('User', id: 1, last_incomplete_spree_order: nil))
       end
-      it 'redirects unauthorized path' do
+      it 'redirects forbidden path' do
         get :index
-        expect(response).to redirect_to('/unauthorized')
+        expect(response).to redirect_to(spree.forbidden_path)
       end
     end
     context 'when guest user' do

@@ -181,7 +181,7 @@ describe "Products", type: :feature do
         wait_for_ajax
         check "Large"
         click_button "Create"
-        expect(page).to have_content("Shipping category can't be blank")
+        expect(page).to have_content("Shipping Category can't be blank")
         expect(field_labeled("Size")).to be_checked
         expect(field_labeled("Large")).to be_checked
         expect(field_labeled("Small")).not_to be_checked
@@ -215,18 +215,18 @@ describe "Products", type: :feature do
         fill_in "product_sku", with: "B100"
         fill_in "product_price", with: "100"
         click_button "Create"
-        expect(page).to have_content("Shipping category can't be blank")
+        expect(page).to have_content("Shipping Category can't be blank")
       end
 
       context "using a locale with a different decimal format " do
         before do
           # change English locale’s separator and delimiter to match 19,99 format
           I18n.backend.store_translations(:en,
-            :number => {
-              :currency => {
-                :format => {
-                  :separator => ",",
-                  :delimiter => "."
+            number: {
+              currency: {
+                format: {
+                  separator: ",",
+                  delimiter: "."
                 }
               }
             })
@@ -235,18 +235,18 @@ describe "Products", type: :feature do
         after do
           # revert changes to English locale
           I18n.backend.store_translations(:en,
-            :number => {
-              :currency => {
-                :format => {
-                  :separator => ".",
-                  :delimiter => ","
+            number: {
+              currency: {
+                format: {
+                  separator: ".",
+                  delimiter: ","
                 }
               }
             })
         end
 
-        it "should show localized price value on validation errors", :js => true do
-          fill_in "product_price", :with => "19,99"
+        it "should show localized price value on validation errors", js: true do
+          fill_in "product_price", with: "19,99"
           click_button "Create"
           expect(find('input#product_price').value).to eq('19,99')
         end
@@ -320,7 +320,9 @@ describe "Products", type: :feature do
 
       it 'should add option_types when selecting a prototype', js: true do
         visit spree.admin_product_path(product)
-        click_link 'Properties'
+        within('#sidebar') do
+          click_link 'Properties'
+        end
         click_link "Select From Prototype"
 
         within("#prototypes tr#row_#{prototype.id}") do
@@ -332,9 +334,58 @@ describe "Products", type: :feature do
           expect(first('input[type=text]').value).to eq('baseball_cap_color')
         end
       end
+
+      context "using a locale with a different decimal format" do
+        before do
+          # change English locale’s separator and delimiter to match 19,99 format
+          I18n.backend.store_translations(
+            :en,
+            number: {
+              currency: {
+                format: {
+                  separator: ",",
+                  delimiter: "."
+                }
+              },
+              format: {
+                separator: ",",
+                delimiter: "."
+              }
+            }
+          )
+        end
+
+        after do
+          # revert changes to English locale
+          I18n.backend.store_translations(
+            :en,
+            number: {
+              currency: {
+                format: {
+                  separator: ".",
+                  delimiter: ","
+                }
+              },
+              format: {
+                separator: ".",
+                delimiter: ","
+              }
+            }
+          )
+        end
+
+        it 'should parse correctly decimal values like weight' do
+          visit spree.admin_product_path(product)
+          fill_in 'product_weight', with: '1'
+          click_button 'Update'
+          weight_prev = find('#product_weight').value
+          click_button 'Update'
+          expect(find('#product_weight').value).to eq(weight_prev)
+        end
+      end
     end
 
-    context 'deleting a product', :js => true do
+    context 'deleting a product', js: true do
       let!(:product) { create(:product) }
 
       it "is still viewable" do

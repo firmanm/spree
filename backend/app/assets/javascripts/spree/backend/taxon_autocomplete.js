@@ -1,12 +1,16 @@
 'use strict';
 
 var set_taxon_select = function(selector){
+  function formatTaxon(taxon) {
+    return Select2.util.escapeMarkup(taxon.pretty_name);
+  }
+
   if ($(selector).length > 0) {
     $(selector).select2({
       placeholder: Spree.translations.taxon_placeholder,
       multiple: true,
       initSelection: function (element, callback) {
-        var url = Spree.url(Spree.routes.taxons_search, {
+        var url = Spree.url(Spree.routes.taxons_api, {
           ids: element.val(),
           without_children: true,
           token: Spree.api_key
@@ -16,7 +20,7 @@ var set_taxon_select = function(selector){
         });
       },
       ajax: {
-        url: Spree.routes.taxons_search,
+        url: Spree.routes.taxons_api,
         datatype: 'json',
         data: function (term, page) {
           return {
@@ -37,12 +41,8 @@ var set_taxon_select = function(selector){
           };
         }
       },
-      formatResult: function (taxon) {
-        return taxon.pretty_name;
-      },
-      formatSelection: function (taxon) {
-        return taxon.pretty_name;
-      }
+      formatResult: formatTaxon,
+      formatSelection: formatTaxon
     });
   }
 }

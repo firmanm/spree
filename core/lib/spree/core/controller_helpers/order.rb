@@ -5,7 +5,7 @@ module Spree
         extend ActiveSupport::Concern
 
         included do
-          before_filter :set_current_order
+          before_action :set_current_order
 
           helper_method :current_order
           helper_method :simple_current_order
@@ -35,11 +35,8 @@ module Spree
           @current_order = find_order_by_token_or_user(options, true)
 
           if options[:create_order_if_necessary] && (@current_order.nil? || @current_order.completed?)
-            @current_order = Spree::Order.new(current_order_params)
-            @current_order.user ||= try_spree_current_user
-            # See issue #3346 for reasons why this line is here
-            @current_order.created_by ||= try_spree_current_user
-            @current_order.save!
+            @current_order = Spree::Order.create!(current_order_params)
+            @current_order.associate_user! try_spree_current_user if try_spree_current_user
           end
 
           if @current_order
@@ -82,10 +79,11 @@ module Spree
 
           # Find any incomplete orders for the guest_token
           incomplete_orders = Spree::Order.incomplete.includes(line_items: [variant: [:images, :option_values, :product]])
+          guest_token_order_params = current_order_params.except(:user_id)
           order = if with_adjustments
-                    incomplete_orders.includes(:adjustments).lock(options[:lock]).find_by(current_order_params)
+                    incomplete_orders.includes(:adjustments).lock(options[:lock]).find_by(guest_token_order_params)
                   else
-                    incomplete_orders.lock(options[:lock]).find_by(current_order_params)
+                    incomplete_orders.lock(options[:lock]).find_by(guest_token_order_params)
                   end
 
           # Find any incomplete orders for the current user

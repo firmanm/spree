@@ -21,9 +21,14 @@
 module Spree
   class Product < Spree::Base
     extend FriendlyId
+    include ActsAsTaggable
     friendly_id :slug_candidates, use: :history
 
     acts_as_paranoid
+
+    # we need to have this callback before any dependent: :destroy associations
+    # https://github.com/rails/rails/issues/3458
+    before_destroy :ensure_no_line_items
 
     has_many :product_option_types, dependent: :destroy, inverse_of: :product
     has_many :option_types, through: :product_option_types
@@ -35,6 +40,12 @@ module Spree
 
     has_many :product_promotion_rules, class_name: 'Spree::ProductPromotionRule'
     has_many :promotion_rules, through: :product_promotion_rules, class_name: 'Spree::PromotionRule'
+
+    has_many :promotions, through: :promotion_rules, class_name: 'Spree::Promotion'
+
+    has_many :possible_promotions, -> { advertised.active }, through: :promotion_rules,
+                                                             class_name: 'Spree::Promotion',
+                                                             source: :promotion
 
     belongs_to :tax_category, class_name: 'Spree::TaxCategory'
     belongs_to :shipping_category, class_name: 'Spree::ShippingCategory', inverse_of: :products
@@ -69,7 +80,6 @@ module Spree
 
     has_many :variant_images, -> { order(:position) }, source: :images, through: :variants_including_master
 
-    after_create :set_master_variant_defaults
     after_create :add_associations_from_prototype
     after_create :build_variants_from_option_values_hash, if: :option_values_hash
 
@@ -82,7 +92,6 @@ module Spree
     after_save :run_touch_callbacks, if: :anything_changed?
     after_save :reset_nested_changes
     after_touch :touch_taxons
-    before_destroy :ensure_no_line_items
 
     before_validation :normalize_slug, on: :update
     before_validation :validate_master
@@ -92,10 +101,12 @@ module Spree
       validates :meta_title
     end
     with_options presence: true do
-      validates :name, :shipping_category_id
+      validates :name, :shipping_category
       validates :price, if: proc { Spree::Config[:require_master_price] }
     end
+
     validates :slug, length: { minimum: 3 }, allow_blank: true, uniqueness: true
+    validate :discontinue_on_must_be_later_than_available_on, if: -> { available_on && discontinue_on }
 
     attr_accessor :option_values_hash
 
@@ -153,11 +164,16 @@ module Spree
     end
 
     def discontinue!
-      update_column(:discontinue_on, Time.current)
+      update_attribute(:discontinue_on, Time.current)
     end
 
     def discontinued?
       !!discontinue_on && discontinue_on <= Time.current
+    end
+
+    # determine if any variant (including master) can be supplied
+    def can_supply?
+      variants_including_master.any?(&:can_supply?)
     end
 
     # split variants list into hash which shows mapping of opt value onto matching variants
@@ -192,23 +208,17 @@ module Spree
     end
 
     def property(property_name)
-      return nil unless prop = properties.find_by(name: property_name)
-      product_properties.find_by(property: prop).try(:value)
+      product_properties.joins(:property).find_by(spree_properties: { name: property_name }).try(:value)
     end
 
     def set_property(property_name, property_value, property_presentation = property_name)
-      ActiveRecord::Base.transaction do
+      ApplicationRecord.transaction do
         # Works around spree_i18n #301
         property = Property.create_with(presentation: property_presentation).find_or_create_by(name: property_name)
         product_property = ProductProperty.where(product: self, property: property).first_or_initialize
         product_property.value = property_value
         product_property.save!
       end
-    end
-
-    def possible_promotions
-      promotion_ids = promotion_rules.map(&:promotion_id).uniq
-      Spree::Promotion.advertised.where(id: promotion_ids).reject(&:expired?)
     end
 
     def total_on_hand
@@ -239,10 +249,11 @@ module Spree
     end
 
     def any_variants_not_track_inventory?
+      return true unless Spree::Config.track_inventory_levels
       if variants_including_master.loaded?
-        variants_including_master.any? { |v| !v.should_track_inventory? }
+        variants_including_master.any? { |v| !v.track_inventory? }
       else
-        !Spree::Config.track_inventory_levels || variants_including_master.where(track_inventory: false).exists?
+        variants_including_master.where(track_inventory: false).exists?
       end
     end
 
@@ -258,7 +269,7 @@ module Spree
           price: master.price
         )
       end
-      save
+      throw(:abort) unless save
     end
 
     def ensure_master
@@ -323,11 +334,6 @@ module Spree
       end
     end
 
-    # ensures the master variant is flagged as such
-    def set_master_variant_defaults
-      master.is_master = true
-    end
-
     # Try building a slug based on the following fields in increasing order of specificity.
     def slug_candidates
       [
@@ -365,6 +371,12 @@ module Spree
     def remove_taxon(taxon)
       removed_classifications = classifications.where(taxon: taxon)
       removed_classifications.each &:remove_from_list
+    end
+
+    def discontinue_on_must_be_later_than_available_on
+      if discontinue_on < available_on
+        errors.add(:discontinue_on, :invalid_date_range)
+      end
     end
   end
 end

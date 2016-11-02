@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe "New Order", :type => :feature do
+describe "New Order", type: :feature do
   let!(:product) { create(:product_in_stock) }
   let!(:state) { create(:state) }
   let!(:user) { create(:user, ship_address: create(:address), bill_address: create(:address)) }
@@ -11,6 +11,7 @@ describe "New Order", :type => :feature do
 
   before do
     # create default store
+    allow(Spree.user_class).to receive(:find_by).and_return(user)
     create(:store)
     visit spree.new_admin_order_path
   end
@@ -26,10 +27,7 @@ describe "New Order", :type => :feature do
     click_icon :add
     wait_for_ajax
     click_on "Customer"
-
-    within "#select-customer" do
-      targetted_select2_search user.email, from: "#s2id_customer_search"
-    end
+    select_customer
 
     check "order_use_billing"
     fill_in_address
@@ -62,10 +60,7 @@ describe "New Order", :type => :feature do
       end
 
       click_on "Customer"
-
-      within "#select-customer" do
-        targetted_select2_search user.email, from: "#s2id_customer_search"
-      end
+      select_customer
 
       check "order_use_billing"
       fill_in_address
@@ -76,6 +71,32 @@ describe "New Order", :type => :feature do
       within(".stock-contents") do
         expect(page).to have_content(product.name)
       end
+    end
+  end
+
+  context "adding new item to the order which isn't available", js: true do
+    before do
+      product.update(available_on: nil)
+      select2_search product.name, from: Spree.t(:name_or_sku)
+    end
+
+    it "inventory items is displayed" do
+      expect(page).to have_content(product.name)
+      expect(page).to have_css('#stock_details')
+    end
+
+    context 'on increase in quantity the product should be removed from order', js: true do
+      before do
+        accept_alert do
+          within("table.stock-levels") do
+            fill_in "variant_quantity", with: 2
+            click_icon :add
+            wait_for_ajax
+          end
+        end
+      end
+
+      it { expect(page).not_to have_css('#stock_details') }
     end
   end
 
@@ -106,10 +127,7 @@ describe "New Order", :type => :feature do
   context "start by customer address" do
     it "completes order fine", js: true do
       click_on "Customer"
-
-      within "#select-customer" do
-        targetted_select2_search user.email, from: "#s2id_customer_search"
-      end
+      select_customer
 
       check "order_use_billing"
       fill_in_address
@@ -132,6 +150,7 @@ describe "New Order", :type => :feature do
   # Regression test for #5327
   context "customer with default credit card", js: true do
     before do
+      allow(Spree.user_class).to receive(:find_by).and_return(user)
       create(:credit_card, default: true, user: user)
     end
     it "transitions to delivery not to complete" do
@@ -142,7 +161,7 @@ describe "New Order", :type => :feature do
       end
       wait_for_ajax
       click_link "Customer"
-      targetted_select2 user.email, from: "#s2id_customer_search"
+      select_customer
       click_button "Update"
       expect(Spree::Order.last.state).to eq 'delivery'
     end
@@ -157,5 +176,11 @@ describe "New Order", :type => :feature do
     fill_in "Zip",                       with: "20170"
     targetted_select2_search state.name, from: "#s2id_order_#{kind}_address_attributes_state_id"
     fill_in "Phone",                     with: "123-456-7890"
+  end
+
+  def select_customer
+    within "div#select-customer" do
+      targetted_select2_search user.email, from: "#s2id_customer_search"
+    end
   end
 end

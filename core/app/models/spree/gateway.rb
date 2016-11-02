@@ -4,7 +4,7 @@ module Spree
 
     delegate :authorize, :purchase, :capture, :void, :credit, to: :provider
 
-    validates :name, :type, presence: true
+    validates :type, presence: true
 
     preference :server, :string, default: 'test'
     preference :test_mode, :boolean, default: true
@@ -13,16 +13,11 @@ module Spree
       CreditCard
     end
 
-    # instantiates the selected gateway and configures with the options stored in the database
-    def self.current
-      super
-    end
-
     def provider
       gateway_options = options
       gateway_options.delete :login if gateway_options.has_key?(:login) and gateway_options[:login].nil?
       if gateway_options[:server]
-        ActiveMerchant::Billing::Base.gateway_mode = gateway_options[:server].to_sym
+        ActiveMerchant::Billing::Base.mode = gateway_options[:server].to_sym
       end
       @provider ||= provider_class.new(gateway_options)
     end

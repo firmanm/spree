@@ -1,13 +1,13 @@
 require 'spec_helper'
 
-describe 'orders', :type => :feature do
+describe 'orders', type: :feature do
   let(:order) { OrderWalkthrough.up_to(:complete) }
   let(:user) { create(:user) }
 
   before do
     order.update_attribute(:user_id, user.id)
     order.shipments.destroy_all
-    allow_any_instance_of(Spree::OrdersController).to receive_messages(:try_spree_current_user => user)
+    allow_any_instance_of(Spree::OrdersController).to receive_messages(try_spree_current_user: user)
   end
 
   it "can visit an order" do
@@ -31,7 +31,7 @@ describe 'orders', :type => :feature do
   end
 
   it "should have credit card info if paid with credit card" do
-    create(:payment, :order => order)
+    create(:payment, order: order)
     visit spree.order_path(order)
     within '.payment-info' do
       expect(page).to have_content "Ending in 1111"
@@ -39,7 +39,7 @@ describe 'orders', :type => :feature do
   end
 
   it "should have payment method name visible if not paid with credit card" do
-    create(:check_payment, :order => order)
+    create(:check_payment, order: order)
     visit spree.order_path(order)
     within '.payment-info' do
       expect(page).to have_content "Check"
@@ -69,6 +69,39 @@ describe 'orders', :type => :feature do
 
     within '#order_summary' do
       expect(page).to have_content("#{Spree.t(:order)} #{order.number}")
+    end
+  end
+
+  # Regression test for #6733
+  context "address_requires_state preference" do
+    context "when set to true" do
+      before do
+        configure_spree_preferences { |config| config.address_requires_state = true }
+      end
+
+      it "should show state text" do
+        visit spree.order_path(order)
+
+        within '#order' do
+          expect(page).to have_content(order.bill_address.state_text)
+          expect(page).to have_content(order.ship_address.state_text)
+        end
+      end
+    end
+
+    context "when set to false" do
+      before do
+        configure_spree_preferences { |config| config.address_requires_state = false }
+      end
+
+      it "should not show state text" do
+        visit spree.order_path(order)
+
+        within '#order' do
+          expect(page).not_to have_content(order.bill_address.state_text)
+          expect(page).not_to have_content(order.ship_address.state_text)
+        end
+      end
     end
   end
 end

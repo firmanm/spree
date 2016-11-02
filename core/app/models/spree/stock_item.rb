@@ -4,7 +4,7 @@ module Spree
 
     with_options inverse_of: :stock_items do
       belongs_to :stock_location, class_name: 'Spree::StockLocation'
-      belongs_to :variant, class_name: 'Spree::Variant', counter_cache: true
+      belongs_to :variant, class_name: 'Spree::Variant'
     end
     has_many :stock_movements, inverse_of: :stock_item
 
@@ -18,11 +18,16 @@ module Spree
 
     delegate :weight, :should_track_inventory?, to: :variant
     delegate :name, to: :variant, prefix: true
+    delegate :product, to: :variant
 
     after_save :conditional_variant_touch, if: :changed?
     after_touch { variant.touch }
+    after_destroy { variant.touch }
 
     self.whitelisted_ransackable_attributes = ['count_on_hand', 'stock_location_id']
+    self.whitelisted_ransackable_associations = ['variant']
+
+    scope :with_active_stock_location, -> { joins(:stock_location).merge(Spree::StockLocation.active) }
 
     def backordered_inventory_units
       Spree::InventoryUnit.backordered_for_stock_item(self)

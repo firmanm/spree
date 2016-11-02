@@ -1,32 +1,17 @@
 module Spree
   module Admin
     class UsersController < ResourceController
-      rescue_from Spree::Core::DestroyWithOrdersError, :with => :user_destroy_with_orders_error
+      rescue_from Spree::Core::DestroyWithOrdersError, with: :user_destroy_with_orders_error
 
       after_action :sign_in_if_change_own_password, only: :update
-
-      # http://spreecommerce.com/blog/2010/11/02/json-hijacking-vulnerability/
-      before_action :check_json_authenticity, only: :index
-      before_action :load_roles
-      before_action :extract_roles_from_params, only: [:create, :update]
-
-      def index
-        respond_with(@collection) do |format|
-          format.html
-          format.json { render :json => json_data }
-        end
-      end
 
       def show
         redirect_to edit_admin_user_path(@user)
       end
 
       def create
-
         @user = Spree.user_class.new(user_params)
         if @user.save
-          set_roles
-
           flash.now[:success] = flash_message_for(@user, :successfully_created)
           render :edit
         else
@@ -41,7 +26,6 @@ module Spree
         end
 
         if @user.update_attributes(user_params)
-          set_roles
           flash.now[:success] = Spree.t(:account_updated)
         end
 
@@ -95,38 +79,27 @@ module Spree
 
         def collection
           return @collection if @collection.present?
+          @collection = super
           if request.xhr? && params[:q].present?
-            @collection = Spree.user_class.includes(:bill_address, :ship_address)
+            @collection = @collection.includes(:bill_address, :ship_address)
                               .where("spree_users.email #{LIKE} :search
                                      OR (spree_addresses.firstname #{LIKE} :search AND spree_addresses.id = spree_users.bill_address_id)
                                      OR (spree_addresses.lastname  #{LIKE} :search AND spree_addresses.id = spree_users.bill_address_id)
                                      OR (spree_addresses.firstname #{LIKE} :search AND spree_addresses.id = spree_users.ship_address_id)
                                      OR (spree_addresses.lastname  #{LIKE} :search AND spree_addresses.id = spree_users.ship_address_id)",
-                                    { :search => "#{params[:q].strip}%" })
+                                    { search: "#{params[:q].strip}%" })
                               .limit(params[:limit] || 100)
           else
-            @search = Spree.user_class.ransack(params[:q])
+            @search = @collection.ransack(params[:q])
             @collection = @search.result.page(params[:page]).per(Spree::Config[:admin_products_per_page])
           end
         end
 
       private
 
-      def set_roles
-        if @roles_ids
-          @user.spree_roles = Spree::Role.where(id: @roles_ids)
-        end
-      end
-
-      def extract_roles_from_params
-        if params[:user]
-          @roles_ids = params[:user].delete("spree_role_ids")
-        end
-      end
-
       def user_params
         params.require(:user).permit(permitted_user_attributes |
-                                     [:spree_role_ids,
+                                     [spree_role_ids: [],
                                       ship_address_attributes: permitted_address_attributes,
                                       bill_address_attributes: permitted_address_attributes])
       end
@@ -156,10 +129,6 @@ module Spree
         if try_spree_current_user == @user && @user.password.present?
           sign_in(@user, event: :authentication, bypass: true)
         end
-      end
-
-      def load_roles
-        @roles = Spree::Role.all
       end
     end
   end

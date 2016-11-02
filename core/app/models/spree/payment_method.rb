@@ -5,7 +5,7 @@ module Spree
 
     DISPLAY = [:both, :front_end, :back_end].freeze
 
-    scope :active,                 -> { where(active: true) }
+    scope :active,                 -> { where(active: true).order(position: :asc) }
     scope :available,              -> { active.where(display_on: [:front_end, :back_end, :both]) }
     scope :available_on_front_end, -> { active.where(display_on: [:front_end, :both]) }
     scope :available_on_back_end,  -> { active.where(display_on: [:back_end, :both]) }
@@ -62,6 +62,16 @@ module Spree
 
     def cancel(response)
       raise ::NotImplementedError, 'You must implement cancel method for this payment method.'
+    end
+
+    def store_credit?
+      self.class == Spree::PaymentMethod::StoreCredit
+    end
+
+    # Custom PaymentMethod/Gateway can redefine this method to check method
+    # availability for concrete order.
+    def available_for_order?(_order)
+      true
     end
   end
 end

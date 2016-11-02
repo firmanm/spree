@@ -1,7 +1,9 @@
 require 'spec_helper'
 
 describe 'Users', type: :feature do
+  include Spree::BaseHelper
   stub_authorization!
+  include Spree::Admin::BaseHelper
 
   let!(:country) { create(:country) }
   let!(:user_a) { create(:user_with_addresses, email: 'a@example.com') }
@@ -33,12 +35,12 @@ describe 'Users', type: :feature do
         expect(page).to have_content (order.total + order_2.total)
         expect(page).to have_content orders.count
         expect(page).to have_content (orders.sum(&:total) / orders.count)
-        expect(page).to have_content I18n.l(user_a.created_at.to_date)
+        expect(page).to have_content pretty_time(user_a.created_at)
       end
     end
 
     it 'can go back to the users list' do
-      expect(page).to have_link Spree.t(:back_to_users_list), href: spree.admin_users_path
+      expect(page).to have_link Spree.t(:users), href: spree.admin_users_path
     end
 
     it 'can navigate to the account page' do
@@ -163,7 +165,7 @@ describe 'Users', type: :feature do
       it 'can generate a new api key' do
         within("#admin_user_edit_api_key") do
           expect(user_a.spree_api_key).to be_blank
-          click_button Spree.t('generate_key', :scope => 'api')
+          click_button Spree.t('generate_key', scope: 'api')
         end
 
         expect(user_a.reload.spree_api_key).to be_present
@@ -183,7 +185,7 @@ describe 'Users', type: :feature do
 
       it 'can clear an api key' do
         within("#admin_user_edit_api_key") do
-          click_button Spree.t('clear_key', :scope => 'api')
+          click_button Spree.t('clear_key', scope: 'api')
         end
 
         expect(user_a.reload.spree_api_key).to be_blank
@@ -194,7 +196,7 @@ describe 'Users', type: :feature do
         old_key = user_a.spree_api_key
 
         within("#admin_user_edit_api_key") do
-          click_button Spree.t('regenerate_key', :scope => 'api')
+          click_button Spree.t('regenerate_key', scope: 'api')
         end
 
         expect(user_a.reload.spree_api_key).to be_present
@@ -219,8 +221,8 @@ describe 'Users', type: :feature do
 
     context "completed_at" do
       it_behaves_like "a sortable attribute" do
-        let(:text_match_1) { I18n.l(order.completed_at.to_date) }
-        let(:text_match_2) { I18n.l(order_2.completed_at.to_date) }
+        let(:text_match_1) { order_time(order.completed_at) }
+        let(:text_match_2) { order_time(order_2.completed_at) }
         let(:table_id) { "listing_orders" }
         let(:sort_link) { "orders_completed_at_title" }
       end
@@ -250,8 +252,8 @@ describe 'Users', type: :feature do
 
     context "completed_at" do
       it_behaves_like "a sortable attribute" do
-        let(:text_match_1) { I18n.l(order.completed_at.to_date) }
-        let(:text_match_2) { I18n.l(order_2.completed_at.to_date) }
+        let(:text_match_1) { order_time(order.completed_at) }
+        let(:text_match_2) { order_time(order_2.completed_at) }
         let(:table_id) { "listing_items" }
         let(:sort_link) { "orders_completed_at_title" }
       end

@@ -34,9 +34,9 @@ module Spree
           params[:q][:completed_at_lt] = params[:q].delete(:created_at_lt)
         end
 
-        @search = Order.accessible_by(current_ability, :index).ransack(params[:q])
+        @search = Order.preload(:user).accessible_by(current_ability, :index).ransack(params[:q])
 
-        # lazyoading other models here (via includes) may result in an invalid query
+        # lazy loading other models here (via includes) may result in an invalid query
         # e.g. SELECT  DISTINCT DISTINCT "spree_orders".id, "spree_orders"."created_at" AS alias_0 FROM "spree_orders"
         # see https://github.com/spree/spree/pull/3919
         @orders = @search.result(distinct: true).
@@ -56,9 +56,7 @@ module Spree
       def edit
         can_not_transition_without_customer_info
 
-        unless @order.completed?
-          @order.refresh_shipment_rates(ShippingMethod::DISPLAY_ON_FRONT_AND_BACK_END)
-        end
+        @order.refresh_shipment_rates(ShippingMethod::DISPLAY_ON_FRONT_AND_BACK_END)
       end
 
       def cart
@@ -72,7 +70,7 @@ module Spree
 
       def update
         if @order.update_attributes(params[:order]) && @order.line_items.present?
-          @order.update!
+          @order.update_with_updater!
           unless @order.completed?
             # Jump to next step if order is not completed.
             redirect_to admin_order_customer_path(@order) and return
@@ -87,26 +85,26 @@ module Spree
       def cancel
         @order.canceled_by(try_spree_current_user)
         flash[:success] = Spree.t(:order_canceled)
-        redirect_to :back
+        redirect_back fallback_location: spree.edit_admin_order_url(@order)
       end
 
       def resume
         @order.resume!
         flash[:success] = Spree.t(:order_resumed)
-        redirect_to :back
+        redirect_back fallback_location: spree.edit_admin_order_url(@order)
       end
 
       def approve
         @order.approved_by(try_spree_current_user)
         flash[:success] = Spree.t(:order_approved)
-        redirect_to :back
+        redirect_back fallback_location: spree.edit_admin_order_url(@order)
       end
 
       def resend
         OrderMailer.confirm_email(@order.id, true).deliver_later
         flash[:success] = Spree.t(:order_email_resent)
 
-        redirect_to :back
+        redirect_back fallback_location: spree.edit_admin_order_url(@order)
       end
 
       def open_adjustments
@@ -114,7 +112,7 @@ module Spree
         adjustments.update_all(state: 'open')
         flash[:success] = Spree.t(:all_adjustments_opened)
 
-        respond_with(@order) { |format| format.html { redirect_to :back } }
+        respond_with(@order) { |format| format.html { redirect_back fallback_location: spree.admin_order_adjustments_url(@order) } }
       end
 
       def close_adjustments
@@ -122,7 +120,7 @@ module Spree
         adjustments.update_all(state: 'closed')
         flash[:success] = Spree.t(:all_adjustments_closed)
 
-        respond_with(@order) { |format| format.html { redirect_to :back } }
+        respond_with(@order) { |format| format.html { redirect_back fallback_location: spree.admin_order_adjustments_url(@order) } }
       end
 
       private

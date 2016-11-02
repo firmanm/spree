@@ -4,6 +4,36 @@ module Spree
   describe Api::V1::CheckoutsController, type: :controller do
     render_views
 
+    shared_examples_for 'action which loads order using load_order_with_lock' do
+      before do
+        allow(controller).to receive(:load_order).with(true).and_return(true)
+      end
+
+      it 'should invoke load_order_with_lock' do
+        expect(controller).to receive(:load_order_with_lock).exactly(1).times
+      end
+
+      it 'should invoke load_order' do
+        expect(controller).to receive(:load_order).with(true).exactly(1).times.and_return(true)
+      end
+
+      context 'ensure no double_render_error' do
+        before do
+          def controller.load_order(*)
+            respond_with(@order, default_template: 'spree/api/v1/orders/show', status: 200)
+          end
+        end
+
+        it 'should not generate double_render_error' do
+          expect(response).to be_success
+        end
+      end
+
+      after do
+        send_request
+      end
+    end
+
     before(:each) do
       stub_authentication!
       Spree::Config[:track_inventory_levels] = false
@@ -46,7 +76,7 @@ module Spree
         expect(order.state).to eq "cart"
         expect(order.email).not_to be_nil
         request.headers["X-Spree-Order-Token"] = order.guest_token
-        api_put :update, :id => order.to_param
+        api_put :update, id: order.to_param
         expect(order.reload.state).to eq "address"
       end
 
@@ -211,7 +241,7 @@ module Spree
       end
 
       it "can transition from confirm to complete" do
-        order.update_columns(completed_at: Time.current, state: 'complete')
+        order.update_columns(state: 'confirm')
         allow_any_instance_of(Spree::Order).to receive_messages(payment_required?: false)
         api_put :update, id: order.to_param, order_token: order.guest_token
         expect(json_response['state']).to eq('complete')
@@ -258,8 +288,14 @@ module Spree
         order.update_column(:state, "payment")
         expect(PromotionHandler::Coupon).to receive(:new).with(order).and_call_original
         expect_any_instance_of(PromotionHandler::Coupon).to receive(:apply).and_return({ coupon_applied?: true })
-        api_put :update, :id => order.to_param, order_token: order.guest_token, order: { coupon_code: "foobar" }
+        api_put :update, id: order.to_param, order_token: order.guest_token, order: { coupon_code: "foobar" }
       end
+
+      def send_request
+        api_put :update, id: order.to_param, order_token: order.guest_token
+      end
+
+      it_should_behave_like 'action which loads order using load_order_with_lock'
     end
 
     context "PUT 'next'" do
@@ -286,7 +322,7 @@ module Spree
           email: nil
         )
 
-        api_put :next, :id => order.to_param, :order_token => order.guest_token
+        api_put :next, id: order.to_param, order_token: order.guest_token
         expect(response.status).to eq(422)
         expect(json_response['error']).to match(/could not be transitioned/)
       end
@@ -296,6 +332,12 @@ module Spree
         api_put :next, id: order.to_param, order_token: order.guest_token, order: {}
         expect(json_response["errors"]["base"]).to include(Spree.t(:no_payment_found))
       end
+
+      def send_request
+        api_put :next, id: order.to_param, order_token: order.guest_token
+      end
+
+      it_should_behave_like 'action which loads order using load_order_with_lock'
     end
 
     context "PUT 'advance'" do
@@ -310,6 +352,12 @@ module Spree
         api_put :advance, id: order.to_param, order_token: order.guest_token
         expect(json_response['id']).to eq(order.id)
       end
+
+      def send_request
+        api_put :advance, id: order.to_param, order_token: order.guest_token
+      end
+
+      it_should_behave_like 'action which loads order using load_order_with_lock'
     end
   end
 end

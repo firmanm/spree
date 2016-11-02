@@ -1,9 +1,11 @@
 require 'spec_helper'
 
-describe Spree::StockItem, :type => :model do
+describe Spree::StockItem, type: :model do
   let(:stock_location) { create(:stock_location_with_items) }
 
   subject { stock_location.stock_items.order(:id).first }
+
+  it { is_expected.to delegate_method(:product).to(:variant) }
 
   it 'maintains the count on hand for a variant' do
     expect(subject.count_on_hand).to eq 10
@@ -73,7 +75,7 @@ describe Spree::StockItem, :type => :model do
       let(:inventory_unit_2) { double('InventoryUnit2') }
 
       before do
-        allow(subject).to receive_messages(:backordered_inventory_units => [inventory_unit, inventory_unit_2])
+        allow(subject).to receive_messages(backordered_inventory_units: [inventory_unit, inventory_unit_2])
         subject.update_column(:count_on_hand, -2)
       end
 
@@ -94,7 +96,7 @@ describe Spree::StockItem, :type => :model do
       end
 
       context "adds new items" do
-        before { allow(subject).to receive_messages(:backordered_inventory_units => [inventory_unit, inventory_unit_2]) }
+        before { allow(subject).to receive_messages(backordered_inventory_units: [inventory_unit, inventory_unit_2]) }
 
         it "fills existing backorders" do
           expect(inventory_unit).to receive(:fill_backorder)
@@ -132,7 +134,7 @@ describe Spree::StockItem, :type => :model do
       end
 
       context "adds new items" do
-        before { allow(subject).to receive_messages(:backordered_inventory_units => [inventory_unit, inventory_unit_2]) }
+        before { allow(subject).to receive_messages(backordered_inventory_units: [inventory_unit, inventory_unit_2]) }
 
         it "fills existing backorders" do
           expect(inventory_unit).to receive(:fill_backorder)
@@ -224,9 +226,11 @@ describe Spree::StockItem, :type => :model do
 
   describe "#after_touch" do
     it "touches its variant" do
-      expect do
-        subject.touch
-      end.to change { subject.variant.updated_at }
+      Timecop.scale(1000) do
+        expect do
+          subject.touch
+        end.to change { subject.variant.updated_at }
+      end
     end
   end
 
@@ -404,6 +408,24 @@ describe Spree::StockItem, :type => :model do
             end
           end
         end
+      end
+    end
+  end
+
+  describe 'scopes' do
+    context '.with_active_stock_location' do
+      let(:stock_items_with_active_location) { Spree::StockItem.with_active_stock_location }
+
+      context 'when stock location is active' do
+        before { stock_location.update_column(:active, true) }
+
+        it { expect(stock_items_with_active_location).to include(subject) }
+      end
+
+      context 'when stock location is inactive' do
+        before { stock_location.update_column(:active, false) }
+
+        it { expect(stock_items_with_active_location).to_not include(subject) }
       end
     end
   end

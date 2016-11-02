@@ -3,7 +3,7 @@
 <% end %>
 
 <% content_for :page_actions do %>
-  <%= button_link_to new_button_text, new_object_url, { icon: 'add', id: 'admin_new_named_type', :class => "btn-success" } %>
+  <%= button_link_to new_button_text, new_object_url, { icon: 'add', id: 'admin_new_named_type', class: "btn-success" } %>
 <% end if can? :create, resource %>
 
 <% if @collection.any? %>
@@ -11,11 +11,11 @@
     <thead>
       <tr data-hook="named_types_header">
         <th><%= Spree.t(:name) %></th>
-        <th><%= Spree.t(:state) %></th>
+        <th><%= Spree.t(:status) %></th>
         <th></th>
       </tr>
     </thead>
-    <tbody>
+    <tbody id="<%= resource_name.to_s.parameterize.underscore %>">
       <% @collection.each do |named_type| %>
         <tr id="<%= spree_dom_id named_type %>" data-hook="named_type_row">
           <td class="align-center">
@@ -27,6 +27,7 @@
           <td class="actions actions-1 text-right">
             <% if named_type.mutable? %>
               <%= link_to_edit(named_type, no_text: true) if can? :edit, named_type %>
+              <%= link_to_delete(named_type, no_text: true) if can? :delete, named_type %>
             <% end %>
           </td>
         </tr>

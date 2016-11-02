@@ -8,6 +8,8 @@ module Spree
       @variant = line_item.variant
     end
 
+    delegate :inventory_units, to: :line_item
+
     # Only verify inventory for completed orders (as orders in frontend checkout
     # have inventory assigned via +order.create_proposed_shipment+) or when
     # shipment is explicitly passed
@@ -23,19 +25,18 @@ module Spree
 
           shipment = determine_target_shipment unless shipment
           add_to_shipment(shipment, quantity)
+        elsif inventory_units.size == line_item.quantity && !line_item.changed?
+          remove(inventory_units, shipment)
         elsif inventory_units.size > line_item.quantity
           remove(inventory_units, shipment)
         end
       end
     end
 
-    def inventory_units
-      line_item.inventory_units
-    end
-
     private
+
       def remove(item_units, shipment = nil)
-        quantity = item_units.size - line_item.quantity
+        quantity = set_quantity_to_remove(item_units)
 
         if shipment.present?
           remove_from_shipment(shipment, quantity)
@@ -44,6 +45,14 @@ module Spree
             break if quantity == 0
             quantity -= remove_from_shipment(shipment, quantity)
           end
+        end
+      end
+
+      def set_quantity_to_remove(item_units)
+        if (item_units.size - line_item.quantity).zero?
+          line_item.quantity
+        else
+          item_units.size - line_item.quantity
         end
       end
 
@@ -82,9 +91,7 @@ module Spree
       def remove_from_shipment(shipment, quantity)
         return 0 if quantity == 0 || shipment.shipped?
 
-        shipment_units = shipment.inventory_units_for_item(line_item, variant).reject do |variant_unit|
-          variant_unit.state == 'shipped'
-        end.sort_by(&:state)
+        shipment_units = shipment.inventory_units_for_item(line_item, variant).reject(&:shipped?).sort_by(&:state)
 
         removed_quantity = 0
 

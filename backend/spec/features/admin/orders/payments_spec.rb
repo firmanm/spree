@@ -50,6 +50,7 @@ describe 'Payments', type: :feature, js: true do
     end
 
     it 'should list all captures for a payment' do
+      Spree::ShippingMethod.delete_all
       capture_amount = order.outstanding_balance/2 * 100
       payment.capture!(capture_amount)
 
@@ -62,7 +63,7 @@ describe 'Payments', type: :feature, js: true do
       end
     end
 
-    it 'lists and create payments for an order', js: true do
+    it 'lists and create payments for an order' do
       within_row(1) do
         expect(column_text(3)).to eq('$150.00')
         expect(column_text(4)).to eq('Credit Card')
@@ -91,7 +92,7 @@ describe 'Payments', type: :feature, js: true do
     end
 
     # Regression test for #1269
-    it 'cannot create a payment for an order with no payment methods' do
+    it 'cannot create a payment for an order with no payment methods', js: false do
       Spree::PaymentMethod.delete_all
       order.payments.delete_all
 
@@ -101,7 +102,7 @@ describe 'Payments', type: :feature, js: true do
     end
 
     %w[checkout pending].each do |state|
-      context "payment is #{state.inspect}", js: true do
+      context "payment is #{state.inspect}" do
         let(:state) { state }
 
         it 'allows the amount to be edited by clicking on the edit button then saving' do
@@ -152,7 +153,7 @@ describe 'Payments', type: :feature, js: true do
       end
     end
 
-    context 'payment is completed' do
+    context 'payment is completed', js: false do
       let(:state) { 'completed' }
 
       it 'does not allow the amount to be edited' do
@@ -204,7 +205,7 @@ describe 'Payments', type: :feature, js: true do
 
       before { visit spree.admin_order_payments_path(order) }
 
-      it "is able to reuse customer payment source" do
+      it "is able to reuse customer payment source", js: false do
         expect(find("#card_#{cc.id}")).to be_checked
         click_button "Continue"
         expect(page).to have_content("Payment has been successfully created!")

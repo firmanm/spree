@@ -14,7 +14,7 @@ module Spree
       let(:product) do
         product = Spree::Product.create(name: 'Test',
                                         sku: 'TEST-1',
-                                        price: 33.22)
+                                        price: 33.22, available_on: Time.current - 1.day)
         product.shipping_category = create(:shipping_category)
         product.save
         product
@@ -176,7 +176,7 @@ module Spree
         }
 
         order = Importer::Order.import(user, params)
-        expect(order.ship_address.state.name).to eq 'Alabama'
+        expect(order.ship_address.state.name).to eq state.name
       end
 
       context "with a different currency" do
@@ -588,7 +588,7 @@ module Spree
           ]
         }
         order = Importer::Order.import(user, params)
-        expect(order.payments.first.created_at).to be_within(0.1).of created_at
+        expect(order.payments.first.created_at).to be_within(1).of created_at
       end
 
       context "raises error" do

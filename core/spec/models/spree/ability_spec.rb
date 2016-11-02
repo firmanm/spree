@@ -17,20 +17,13 @@ class FooAbility
   end
 end
 
-describe Spree::Ability, :type => :model do
-  let(:user) { create(:user) }
+describe Spree::Ability, type: :model do
+  let(:user) { build(:user) }
   let(:ability) { Spree::Ability.new(user) }
   let(:token) { nil }
 
-  before do
-    user.spree_roles.clear
-  end
-
-  TOKEN = 'token123'
-
   after(:each) {
     Spree::Ability.abilities = Set.new
-    user.spree_roles = []
   }
 
   context 'register_ability' do
@@ -41,7 +34,19 @@ describe Spree::Ability, :type => :model do
 
     it 'should apply the registered abilities permissions' do
       Spree::Ability.register_ability(FooAbility)
-      expect(Spree::Ability.new(user).can?(:update, mock_model(Spree::Order, :id => 1))).to be true
+      expect(Spree::Ability.new(user).can?(:update, mock_model(Spree::Order, id: 1))).to be true
+    end
+  end
+
+  context '#abilities_to_register' do
+    it 'adds the ability to the list of abilities' do
+      allow_any_instance_of(Spree::Ability).to receive(:abilities_to_register) { [FooAbility] }
+      expect(Spree::Ability.new(user).abilities).to include FooAbility
+    end
+
+    it 'applies the registered abilities permissions' do
+      allow_any_instance_of(Spree::Ability).to receive(:abilities_to_register) { [FooAbility] }
+      expect(Spree::Ability.new(user).can?(:update, mock_model(Spree::Order, id: 1))).to be true
     end
   end
 
@@ -64,9 +69,9 @@ describe Spree::Ability, :type => :model do
     let(:resource) { Object.new }
     let(:resource_shipment) { Spree::Shipment.new }
     let(:resource_product) { Spree::Product.new }
-    let(:resource_user) { Spree.user_class.new }
+    let(:resource_user) { create :user }
     let(:resource_order) { Spree::Order.new }
-    let(:fakedispatch_user) { Spree.user_class.new }
+    let(:fakedispatch_user) { Spree.user_class.create }
     let(:fakedispatch_ability) { Spree::Ability.new(fakedispatch_user) }
 
     context 'with admin user' do
@@ -161,14 +166,14 @@ describe Spree::Ability, :type => :model do
 
       context 'requested with proper token' do
         let(:token) { 'TOKEN123' }
-        before(:each) { allow(resource).to receive_messages guest_token: 'TOKEN123' }
+        before(:each) { allow(resource).to receive_messages guest_token: token }
         it_should_behave_like 'access granted'
         it_should_behave_like 'no index allowed'
       end
 
       context 'requested with inproper token' do
         let(:token) { 'FAIL' }
-        before(:each) { allow(resource).to receive_messages guest_token: 'TOKEN123' }
+        before(:each) { allow(resource).to receive_messages guest_token: token }
         it_should_behave_like 'create only'
       end
     end
@@ -222,7 +227,7 @@ describe Spree::Ability, :type => :model do
         it_should_behave_like 'no index allowed'
       end
       context 'requested by other user' do
-        let(:resource) { Spree.user_class.new }
+        let(:resource) { create(:user) }
         it_should_behave_like 'create only'
       end
     end

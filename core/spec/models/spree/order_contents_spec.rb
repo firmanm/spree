@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe Spree::OrderContents, :type => :model do
+describe Spree::OrderContents, type: :model do
   let(:order) { Spree::Order.create }
   let(:variant) { create(:variant) }
 
@@ -56,7 +56,7 @@ describe Spree::OrderContents, :type => :model do
 
     context "running promotions" do
       let(:promotion) { create(:promotion) }
-      let(:calculator) { Spree::Calculator::FlatRate.new(:preferred_amount => 10) }
+      let(:calculator) { Spree::Calculator::FlatRate.new(preferred_amount: 10) }
 
       shared_context "discount changes order total" do
         before { subject.add(variant, 1) }
@@ -97,7 +97,7 @@ describe Spree::OrderContents, :type => :model do
           )
         end
         let(:variant) { create(:variant, price: 1000) }
-        let(:calculator) { Spree::Calculator::PercentOnLineItem.new(:preferred_percent => 50) }
+        let(:calculator) { Spree::Calculator::PercentOnLineItem.new(preferred_percent: 50) }
         let!(:action) { Spree::Promotion::Actions::CreateItemAdjustments.create(promotion: promotion, calculator: calculator) }
 
         it "should update included_tax_total" do
@@ -179,6 +179,47 @@ describe Spree::OrderContents, :type => :model do
       subject.remove(variant,1)
       expect(order.item_total.to_f).to eq(19.99)
       expect(order.total.to_f).to eq(19.99)
+    end
+  end
+
+  context "#remove_line_item" do
+    context 'given a shipment' do
+      it "ensure shipment calls update_amounts instead of order calling ensure_updated_shipments" do
+        line_item = subject.add(variant, 1)
+        shipment = create(:shipment)
+        expect(subject.order).to_not receive(:ensure_updated_shipments)
+        expect(shipment).to receive(:update_amounts)
+        subject.remove_line_item(line_item, shipment: shipment)
+      end
+    end
+
+    context 'not given a shipment' do
+      it "ensures updated shipments" do
+        line_item = subject.add(variant, 1)
+        expect(subject.order).to receive(:ensure_updated_shipments)
+        subject.remove_line_item(line_item)
+      end
+    end
+
+    it 'should remove line_item' do
+      line_item = subject.add(variant, 1)
+      subject.remove_line_item(line_item)
+
+      expect(order.reload.line_items).to_not include(line_item)
+    end
+
+    it "should update order totals" do
+      expect(order.item_total.to_f).to eq(0.00)
+      expect(order.total.to_f).to eq(0.00)
+
+      line_item = subject.add(variant,2)
+
+      expect(order.item_total.to_f).to eq(39.98)
+      expect(order.total.to_f).to eq(39.98)
+
+      subject.remove_line_item(line_item)
+      expect(order.item_total.to_f).to eq(0.00)
+      expect(order.total.to_f).to eq(0.00)
     end
   end
 

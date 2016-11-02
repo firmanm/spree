@@ -102,7 +102,7 @@ module Spree
         transition to: :manual_intervention_required, from: [:accepted, :pending, :manual_intervention_required]
       end
 
-      after_transition any => any, :do => :persist_acceptance_status_errors
+      after_transition any => any, do: :persist_acceptance_status_errors
     end
 
     def self.from_inventory_unit(inventory_unit)
@@ -168,8 +168,11 @@ module Spree
 
     def process_inventory_unit!
       inventory_unit.return!
-
-      Spree::StockMovement.create!(stock_item_id: stock_item.id, quantity: 1) if should_restock?
+      Spree::StockMovement.create!(
+        stock_item_id: stock_item.id,
+        quantity: 1,
+        originator: return_authorization
+      ) if should_restock?
     end
 
     # This logic is also present in the customer return. The reason for the

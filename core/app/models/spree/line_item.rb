@@ -1,6 +1,6 @@
 module Spree
   class LineItem < Spree::Base
-    before_validation :invalid_quantity_check
+    before_validation :ensure_valid_quantity
 
     with_options inverse_of: :line_items do
       belongs_to :order, class_name: "Spree::Order", touch: true
@@ -16,25 +16,21 @@ module Spree
     before_validation :copy_price
     before_validation :copy_tax_category
 
-    validates :variant, presence: true
-    validates :quantity, numericality:
-                        {
-                          only_integer: true,
-                          greater_than: -1,
-                          message: Spree.t('validation.must_be_int')
-                        }
+    validates :variant, :order, presence: true
+    validates :quantity, numericality: { only_integer: true, message: Spree.t('validation.must_be_int') }
     validates :price, numericality: true
-    validates_with Stock::AvailabilityValidator
-    validate :ensure_proper_currency
 
-    before_destroy :update_inventory
+    validates_with Stock::AvailabilityValidator
+    validate :ensure_proper_currency, if: -> { order.present? }
+
+    before_destroy :verify_order_inventory, if: -> { order.has_checkout_step?("delivery") }
+
     before_destroy :destroy_inventory_units
 
     after_save :update_inventory
     after_save :update_adjustments
 
     after_create :update_tax_charge
-    # after_create :update_adjustment_total
 
     delegate :name, :description, :sku, :should_track_inventory?, :product, to: :variant
     delegate :tax_zone, to: :order
@@ -89,7 +85,8 @@ module Spree
     alias money display_total
 
     def invalid_quantity_check
-      self.quantity = 0 if quantity.nil? || quantity < 0
+      warn "`invalid_quantity_check` is deprecated. Use private `ensure_valid_quantity` instead."
+      ensure_valid_quantity
     end
 
     def sufficient_stock?
@@ -111,7 +108,16 @@ module Spree
       assign_attributes opts
     end
 
+    # Remove variant default_scope `deleted_at: nil`
+    def variant
+      Spree::Variant.unscoped { super }
+    end
+
     private
+
+    def ensure_valid_quantity
+      self.quantity = 0 if quantity.nil? || quantity < 0
+    end
 
     def update_price_from_modifier(currency, opts)
       if currency
@@ -126,12 +132,16 @@ module Spree
 
     def update_inventory
       if (changed? || target_shipment.present?) && order.has_checkout_step?("delivery")
-        Spree::OrderInventory.new(order, self).verify(target_shipment)
+        verify_order_inventory
       end
     end
 
+    def verify_order_inventory
+      Spree::OrderInventory.new(order, self).verify(target_shipment)
+    end
+
     def destroy_inventory_units
-      inventory_units.destroy_all
+      throw(:abort) unless inventory_units.destroy_all
     end
 
     def update_adjustments

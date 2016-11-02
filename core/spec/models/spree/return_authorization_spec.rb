@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe Spree::ReturnAuthorization, :type => :model do
+describe Spree::ReturnAuthorization, type: :model do
   let(:order) { create(:shipped_order) }
   let(:stock_location) { create(:stock_location) }
   let(:rma_reason) { create(:return_authorization_reason) }
@@ -82,6 +82,10 @@ describe Spree::ReturnAuthorization, :type => :model do
       end
 
     end
+  end
+
+  describe 'whitelisted_ransackable_attributes' do
+    it { expect(Spree::ReturnAuthorization.whitelisted_ransackable_attributes).to eq(%w(memo number state)) }
   end
 
   context "#currency" do

@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe "General Settings", type: :feature, js: true do
+describe "General Settings", type: :feature do
   stub_authorization!
 
   before(:each) do
@@ -15,6 +15,7 @@ describe "General Settings", type: :feature, js: true do
       expect(find("#store_name").value).to eq("Test Store")
       expect(find("#store_url").value).to eq("test.example.org")
       expect(find("#store_mail_from_address").value).to eq("test@example.org")
+      expect(page).to_not have_content(Spree.t(:security_settings))
     end
   end
 
@@ -30,7 +31,7 @@ describe "General Settings", type: :feature, js: true do
     end
   end
 
-  context "clearing the cache" do
+  context "clearing the cache", js: true do
     it "should clear the cache" do
       expect(page).to_not have_content(Spree.t(:clear_cache_ok))
       expect(page).to have_content(Spree.t(:clear_cache_warning))

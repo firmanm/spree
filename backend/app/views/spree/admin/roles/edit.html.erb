@@ -1,6 +1,9 @@
 <% content_for :page_title do %>
-  <%= Spree.t(:editing_resource, resource: Spree::Role.model_name.human) %>
+  <%= link_to Spree.t(:roles), spree.admin_roles_url %> /
+  <%= @role.name.capitalize %>
 <% end %>
+
+<%= render partial: 'spree/admin/shared/error_messages', locals: { target: @role } %>
 
 <%= form_for [:admin, @role] do |f| %>
   <fieldset>

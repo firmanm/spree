@@ -83,18 +83,20 @@ describe Spree::Admin::OrdersController, type: :controller do
     end
 
     # Regression test for #3684
-    context "#edit" do
-      it "does not refresh rates if the order is completed" do
-        allow(order).to receive_messages completed?: true
-        expect(order).not_to receive :refresh_shipment_rates
+    describe "#edit" do
+      let(:display_value) { Spree::ShippingMethod::DISPLAY_ON_FRONT_AND_BACK_END }
+
+      before do
+        allow(controller).to receive(:can_not_transition_without_customer_info)
+        allow(order).to receive(:refresh_shipment_rates).with(display_value).and_return(true)
+      end
+
+      after do
         spree_get :edit, id: order.number
       end
 
-      it "does refresh the rates if the order is incomplete" do
-        allow(order).to receive_messages completed?: false
-        expect(order).to receive :refresh_shipment_rates
-        spree_get :edit, id: order.number
-      end
+      it { expect(controller).to receive(:can_not_transition_without_customer_info) }
+      it { expect(order).to receive(:refresh_shipment_rates).with(display_value).and_return(true) }
     end
 
     # Test for #3919
@@ -109,11 +111,20 @@ describe Spree::Admin::OrdersController, type: :controller do
         expect(Spree::Order.count).to eq 1
       end
 
-      it "does not display duplicated results" do
+      def send_request
         spree_get :index, q: {
           line_items_variant_id_in: Spree::Order.first.variants.map(&:id)
         }
+      end
+
+      it 'does not display duplicate results' do
+        send_request
         expect(assigns[:orders].map { |o| o.number }.count).to eq 1
+      end
+
+      it 'preloads users' do
+        expect(Spree::Order).to receive(:preload).with(:user).and_return(Spree::Order.all)
+        send_request
       end
     end
 
@@ -136,9 +147,26 @@ describe Spree::Admin::OrdersController, type: :controller do
         expect(flash[:success]).to eql('All adjustments successfully opened!')
       end
 
-      it "redirects back" do
-        spree_post :open_adjustments, id: order.number
-        expect(response).to redirect_to(:back)
+      context 'when referer' do
+        before(:each) do
+          request.env['HTTP_REFERER'] = root_url
+        end
+
+        it "redirects back" do
+          spree_post :open_adjustments, id: order.number
+          expect(response).to redirect_to(root_url)
+        end
+      end
+
+      context 'when no referer' do
+        before(:each) do
+          request.env['HTTP_REFERER'] = nil
+        end
+
+        it 'refirects to fallback location' do
+          spree_post :open_adjustments, id: order.number
+          expect(response).to redirect_to(admin_order_adjustments_url(order))
+        end
       end
     end
 
@@ -161,9 +189,26 @@ describe Spree::Admin::OrdersController, type: :controller do
         expect(flash[:success]).to eql('All adjustments successfully closed!')
       end
 
-      it "redirects back" do
-        spree_post :close_adjustments, id: order.number
-        expect(response).to redirect_to(:back)
+      context 'when referer' do
+        before(:each) do
+          request.env['HTTP_REFERER'] = root_url
+        end
+
+        it "redirects back" do
+          spree_post :close_adjustments, id: order.number
+          expect(response).to redirect_to(root_url)
+        end
+      end
+
+      context 'when no referer' do
+        before(:each) do
+          request.env['HTTP_REFERER'] = nil
+        end
+
+        it 'refirects to fallback location' do
+          spree_post :close_adjustments, id: order.number
+          expect(response).to redirect_to(admin_order_adjustments_url(order))
+        end
       end
     end
   end
@@ -206,14 +251,20 @@ describe Spree::Admin::OrdersController, type: :controller do
         user.spree_roles.clear
         user.spree_roles << Spree::Role.find_or_create_by(name: 'bar')
         spree_put :update, id: order.number
-        expect(response).to redirect_to('/unauthorized')
+        expect(response).to redirect_to(spree.forbidden_path)
       end
     end
 
     it 'should deny access to users without an admin role' do
       allow(user).to receive_messages has_spree_role?: false
       spree_post :index
-      expect(response).to redirect_to('/unauthorized')
+      expect(response).to redirect_to(spree.forbidden_path)
+    end
+
+    it 'should deny access to not signed in users' do
+      allow(controller).to receive_messages spree_current_user: nil
+      spree_get :index
+      expect(response).to redirect_to(spree.root_path)
     end
 
     it 'should restrict returned order(s) on index when using OrderSpecificAbility' do

@@ -34,7 +34,7 @@ describe "Properties", type: :feature, js: true do
         click_on "Filter"
         fill_in "q_name_cont", with: "size"
         click_on 'Search'
-        
+
         expect(page).to have_content("shirt size")
         expect(page).not_to have_content("shirt fit")
       end
@@ -42,7 +42,7 @@ describe "Properties", type: :feature, js: true do
   end
 
   context "creating a property" do
-    it "should allow an admin to create a new product property", js: true do
+    it "should allow an admin to create a new product property" do
       click_link "Products"
       click_link "Properties"
       click_link "new_property_link"
@@ -82,7 +82,9 @@ describe "Properties", type: :feature, js: true do
       create(:product)
       visit spree.admin_products_path
       click_icon :edit
-      click_link "Properties"
+      within('#sidebar') do
+        click_link "Properties"
+      end
     end
 
     # Regression test for #2279
@@ -122,17 +124,22 @@ describe "Properties", type: :feature, js: true do
       fill_in "product_product_properties_attributes_0_property_name", with: "A Property"
       fill_in "product_product_properties_attributes_0_value", with: "A Value"
       click_button "Update"
-      click_link "Properties"
+      within('#sidebar') do
+        click_link "Properties"
+      end
     end
 
     def delete_product_property
-      page.evaluate_script('window.confirm = function() { return true; }')
-      click_icon :delete
-      wait_for_ajax # delete action must finish before reloading
+      accept_alert do
+        click_icon :delete
+        wait_for_ajax # delete action must finish before reloading
+      end
     end
 
     def check_property_row_count(expected_row_count)
-      click_link "Properties"
+      within('#sidebar') do
+        click_link "Properties"
+      end
       expect(page).to have_css("tbody#product_properties")
       expect(all("tbody#product_properties tr").count).to eq(expected_row_count)
     end

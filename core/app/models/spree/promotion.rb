@@ -24,12 +24,14 @@ module Spree
     validates :path, uniqueness: { allow_blank: true }
     validates :usage_limit, numericality: { greater_than: 0, allow_nil: true }
     validates :description, length: { maximum: 255 }, allow_blank: true
+    validate :expires_at_must_be_later_than_starts_at, if: -> { starts_at && expires_at }
 
     before_save :normalize_blank_values
 
-    scope :coupons, ->{ where("#{table_name}.code IS NOT NULL") }
+    scope :coupons, -> { where.not(code: nil) }
+    scope :advertised, -> { where(advertise: true) }
     scope :applied, lambda {
-      joins(<<-SQL).uniq
+      joins(<<-SQL).distinct
         INNER JOIN spree_order_promotions
         ON spree_order_promotions.promotion_id = #{table_name}.id
       SQL
@@ -37,12 +39,10 @@ module Spree
 
     self.whitelisted_ransackable_attributes = ['path', 'promotion_category_id', 'code']
 
-    def self.advertised
-      where(advertise: true)
-    end
-
     def self.with_coupon_code(coupon_code)
-      where("lower(#{table_name}.code) = ?", coupon_code.strip.downcase).first
+      where("lower(#{table_name}.code) = ?", coupon_code.strip.downcase)
+        .includes(:promotion_actions).where.not(spree_promotion_actions: { id: nil })
+        .first
     end
 
     def self.active
@@ -83,7 +83,7 @@ module Spree
       action_taken
     end
 
-    # called anytime order.update! happens
+    # called anytime order.update_with_updater! happens
     def eligible?(promotable)
       return false if expired? || usage_limit_exceeded?(promotable) || blacklisted?(promotable)
       !!eligible_rules(promotable, {})
@@ -194,6 +194,12 @@ module Spree
 
     def match_all?
       match_policy == 'all'
+    end
+
+    def expires_at_must_be_later_than_starts_at
+      if expires_at < starts_at
+        errors.add(:expires_at, :invalid_date_range)
+      end
     end
   end
 end

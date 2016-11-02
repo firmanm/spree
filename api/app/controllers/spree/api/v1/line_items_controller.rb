@@ -6,6 +6,9 @@ module Spree
 
         self.line_item_options = []
 
+        def new
+        end
+
         def create
           variant = Spree::Variant.find(params[:line_item][:variant_id])
           @line_item = order.contents.add(
@@ -33,8 +36,7 @@ module Spree
 
         def destroy
           @line_item = find_line_item
-          variant = Spree::Variant.unscoped.find(@line_item.variant_id)
-          @order.contents.remove(variant, @line_item.quantity)
+          @order.contents.remove_line_item(@line_item)
           respond_with(@line_item, status: 204)
         end
 

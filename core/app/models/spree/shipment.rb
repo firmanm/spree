@@ -17,9 +17,11 @@ module Spree
       has_many :adjustments, as: :adjustable
       has_many :inventory_units, inverse_of: :shipment
       has_many :shipping_rates, -> { order(:cost) }
+      has_many :state_changes, as: :stateful
     end
     has_many :shipping_methods, through: :shipping_rates
-    has_many :state_changes, as: :stateful
+    has_one :selected_shipping_rate, -> { where(selected: true).order(:cost) }, class_name: Spree::ShippingRate
+
 
     after_save :update_adjustments
 
@@ -115,7 +117,7 @@ module Spree
       return 'canceled' if order.canceled?
       return 'pending' unless order.can_ship?
       return 'pending' if inventory_units.any? &:backordered?
-      return 'shipped' if state == 'shipped'
+      return 'shipped' if shipped?
       order.paid? || Spree::Config[:auto_capture_on_dispatch] ? 'ready' : 'pending'
     end
 
@@ -137,7 +139,7 @@ module Spree
     end
 
     def finalize!
-      InventoryUnit.finalize_units!(inventory_units)
+      inventory_units.finalize_units!
       after_resume
     end
 
@@ -150,7 +152,7 @@ module Spree
     end
 
     def inventory_units_for_item(line_item, variant = nil)
-      inventory_units.where(line_item_id: line_item.id, variant_id: line_item.variant.id || variant.id)
+      inventory_units.where(line_item_id: line_item.id, variant_id: line_item.variant_id || variant.id)
     end
 
     def item_cost
@@ -227,10 +229,6 @@ module Spree
       end
 
       shipping_rates
-    end
-
-    def selected_shipping_rate
-      shipping_rates.where(selected: true).first
     end
 
     def selected_shipping_rate_id

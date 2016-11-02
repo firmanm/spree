@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe Spree::Admin::BaseHelper, :type => :helper do
+describe Spree::Admin::BaseHelper, type: :helper do
   include Spree::Admin::BaseHelper
 
   context "#datepicker_field_value" do
@@ -19,6 +19,12 @@ describe Spree::Admin::BaseHelper, :type => :helper do
     it "should return correct form of class" do
       resource_class = Spree::Product
       expect(plural_resource_name(resource_class)).to eq("Products")
+    end
+  end
+
+  context "#order_time" do
+    it "prints in a format" do
+      expect(order_time(DateTime.new(2016, 5, 6, 13, 33))).to eq "2016-05-06 1:33 PM"
     end
   end
 end

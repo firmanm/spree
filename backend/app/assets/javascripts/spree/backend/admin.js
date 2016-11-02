@@ -15,13 +15,6 @@ jQuery(function($) {
     $("span.icon", $(this)).toggleClass("icon-chevron-down");
   });
 
-  $(".js-collapse-sidebar").click(function(){
-    $(".main-right-sidebar").toggleClass("collapsed");
-    $("section.content").toggleClass("sidebar-collapsed");
-    $("span.icon", $(this)).toggleClass("icon-chevron-right");
-    $("span.icon", $(this)).toggleClass("icon-chevron-left");
-  });
-
   $('#main-sidebar').find('[data-toggle="collapse"]').on('click', function()
     {
       if($(this).find('.icon-chevron-left').length == 1){
@@ -81,9 +74,9 @@ jQuery(function($) {
   });
 
   // Main menu active item submenu show
-  var active_item = $('#sidebar').find('.selected');
-  active_item.parent().addClass('in');
-  active_item.parent().prev()
+  var active_item = $('#main-sidebar').find('.selected');
+  active_item.closest('.nav-pills').addClass('in');
+  active_item.closest('.nav-sidebar')
     .find('.icon-chevron-left')
     .removeClass('icon-chevron-left')
     .addClass('icon-chevron-down');
@@ -139,20 +132,29 @@ jQuery(function($) {
     }
   });
 
-  // Enable sidebar toggle
-  $("[data-toggle='offcanvas']").click(function(e) {
-    e.preventDefault();
-
-    // If window is small enough, enable sidebar push menu
-    if ($(window).width() <= 992) {
-      $('.row-offcanvas').toggleClass('active');
-      $('.left-side').removeClass("collapse-left");
-      $(".right-side").removeClass("strech");
-      $('.row-offcanvas').toggleClass("relative");
+  // per page dropdown
+  // preserves all selected filters / queries supplied by user
+  // changes only per_page value
+  $(".js-per-page-select").change(function() {
+    var form  = $(this).closest(".js-per-page-form");
+    var url   = form.attr('action');
+    var value = $(this).val().toString();
+    if (url.match(/\?/)) {
+      url += "&per_page=" + value;
     } else {
-      // Else, enable content streching
-      $('.left-side').toggleClass("collapse-left");
-      $(".right-side").toggleClass("strech");
+      url += "?per_page=" + value;
+    }
+    window.location = url;
+  });
+
+  // injects per_page settings to all available search forms
+  // so when user changes some filters / queries per_page is preserved
+  $(document).ready(function() {
+    var perPageDropdown = $(".js-per-page-select:first");
+    if (perPageDropdown.length) {
+      var perPageValue = perPageDropdown.val().toString();
+      var perPageInput = '<input type="hidden" name="per_page" value=' + perPageValue + ' />';
+      $("#table-filter form").append(perPageInput);
     }
   });
 
@@ -165,7 +167,7 @@ jQuery(function($) {
 $.fn.visible = function(cond) { this[cond ? 'show' : 'hide' ]() };
 
 show_flash = function(type, message) {
-  var flash_div = $('.flash.' + type);
+  var flash_div = $('.alert-' + type);
   if (flash_div.length == 0) {
     flash_div = $('<div class="alert alert-' + type + '" />');
     $('#content').prepend(flash_div);
@@ -256,9 +258,12 @@ $(document).ready(function(){
         },
         dataType: 'script',
         success: function(response) {
-          el.parents("tr").fadeOut('hide', function() {
-            $(this).remove();
-          });
+          var $flash_element = $('.alert-success');
+          if ($flash_element.length) {
+            el.parents("tr").fadeOut('hide', function() {
+              $(this).remove();
+            });
+          }
         },
         error: function(response, textStatus, errorThrown) {
           show_flash('error', response.responseText);
@@ -322,9 +327,10 @@ $(document).ready(function(){
         helper: fixHelper,
         placeholder: 'ui-sortable-placeholder',
         update: function(event, ui) {
+          var tbody = this;
           $("#progress").show();
           positions = {};
-          $.each($('table.sortable tbody tr'), function(position, obj){
+          $.each($('tr', tbody), function(position, obj){
             reg = /spree_(\w+_?)+_(\d+)/;
             parts = reg.exec($(obj).prop('id'));
             if (parts) {

@@ -13,7 +13,11 @@ module Spree
 
     after_touch :touch_all_variants
 
+    delegate :name, :presentation, to: :option_type, prefix: true, allow_nil: true
+
     self.whitelisted_ransackable_attributes = ['presentation']
+
+    private
 
     def touch_all_variants
       variants.update_all(updated_at: Time.current)

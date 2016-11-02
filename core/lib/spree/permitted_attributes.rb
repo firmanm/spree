@@ -20,6 +20,7 @@ module Spree
       :stock_location_attributes,
       :stock_movement_attributes,
       :store_attributes,
+      :store_credit_attributes,
       :taxon_attributes,
       :taxonomy_attributes,
       :user_attributes,
@@ -44,7 +45,7 @@ module Spree
 
     @@image_attributes = [:alt, :attachment, :position, :viewable_type, :viewable_id]
 
-    @@inventory_unit_attributes = [:shipment, :variant_id]
+    @@inventory_unit_attributes = [:shipment, :shipment_id, :variant_id]
 
     @@line_item_attributes = [:id, :variant_id, :quantity]
 
@@ -91,6 +92,8 @@ module Spree
 
     @@store_attributes = [:name, :url, :seo_title, :meta_keywords,
                          :meta_description, :default_currency, :mail_from_address]
+
+    @@store_credit_attributes = [:amount, :category_id, :memo]
 
     @@taxonomy_attributes = [:name]
 

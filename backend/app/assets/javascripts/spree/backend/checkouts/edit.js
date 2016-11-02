@@ -16,8 +16,9 @@ $(document).ready(function() {
     $("#customer_search").select2({
       placeholder: Spree.translations.choose_a_customer,
       ajax: {
-        url: Spree.routes.user_search,
+        url: Spree.routes.users_api,
         datatype: 'json',
+        cache: true,
         data: function(term, page) {
           return {
             q: term,
@@ -25,7 +26,7 @@ $(document).ready(function() {
           }
         },
         results: function(data, page) {
-          return { results: data }
+          return { results: data.users }
         }
       },
       dropdownCssClass: 'customer_search',
@@ -53,7 +54,7 @@ $(document).ready(function() {
             });
           });
         }
-        return customer.email;
+        return Select2.util.escapeMarkup(customer.email);
       }
     })
   }

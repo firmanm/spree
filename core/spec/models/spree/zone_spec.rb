@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe Spree::Zone, :type => :model do
+describe Spree::Zone, type: :model do
   context "#match" do
     let(:country_zone) { create(:zone, kind: 'country') }
 
@@ -12,7 +12,41 @@ describe Spree::Zone, :type => :model do
       create(:state, country: country)
     end
 
+    it { is_expected.to have_many(:shipping_methods).through(:shipping_method_zones).class_name('Spree::ShippingMethod') }
+
     before { country_zone.members.create(zoneable: country) }
+
+    describe 'scopes' do
+      describe '.remove_previous_default' do
+        let(:zone_with_default_tax) { create(:zone, kind: 'country', default_tax: true) }
+        let(:zone_not_with_default_tax) { create(:zone, kind: 'country', default_tax: false) }
+
+        subject { Spree::Zone.with_default_tax }
+
+        it 'is expected to include zone with default tax' do
+          is_expected.to include(zone_with_default_tax)
+        end
+
+        it 'is expected to not include zone with default tax' do
+          is_expected.to_not include(zone_not_with_default_tax)
+        end
+      end
+    end
+
+    describe 'callbacks' do
+      it { is_expected.to callback(:remove_previous_default).after(:save).if(:default_tax?).if(:default_tax_changed?) }
+
+      describe '#remove_previous_default' do
+        let!(:zone_with_default_tax) { create(:zone, kind: 'country', default_tax: true) }
+        let!(:zone_not_with_default_tax) { create(:zone, kind: 'country', default_tax: false) }
+
+        it 'is expected to make previous default tax zones to non default tax zones' do
+          expect(zone_with_default_tax).to be_default_tax
+          zone_not_with_default_tax.update(default_tax: true)
+          expect(zone_with_default_tax.reload).to_not be_default_tax
+        end
+      end
+    end
 
     context "when there is only one qualifying zone" do
       let(:address) { create(:address, country: country, state: state) }
@@ -30,7 +64,9 @@ describe Spree::Zone, :type => :model do
 
       context "when both zones have the same number of members" do
         it "should return the zone that was created first" do
-          expect(Spree::Zone.match(address)).to eq(country_zone)
+          Timecop.scale(100) do
+            expect(Spree::Zone.match(address)).to eq(country_zone)
+          end
         end
       end
 

@@ -1,11 +1,13 @@
-class Spree::Base < ActiveRecord::Base
+class Spree::Base < ApplicationRecord
   include Spree::Preferences::Preferable
   serialize :preferences, Hash
 
   include Spree::RansackableAttributes
 
   after_initialize do
-    self.preferences = default_preferences.merge(preferences) if has_attribute?(:preferences)
+    if has_attribute?(:preferences) && !preferences.nil?
+      self.preferences = default_preferences.merge(preferences)
+    end
   end
 
   if Kaminari.config.page_method_name != :page

@@ -1,6 +1,34 @@
 require 'spec_helper'
 
-describe Spree::Price, :type => :model do
+describe Spree::Price, type: :model do
+  describe '#amount=' do
+    let(:price) { Spree::Price.new }
+    let(:amount) { '3,0A0' }
+
+    before do
+      price.amount = amount
+    end
+
+    it 'is expected to equal to localized number' do
+      expect(price.amount).to eq(Spree::LocalizedNumber.parse(amount))
+    end
+  end
+
+  describe '#price' do
+    let(:price) { Spree::Price.new }
+    let(:amount) { 3000.00 }
+
+    context 'when amount is changed' do
+      before do
+        price.amount = amount
+      end
+
+      it 'is expected to equal to price' do
+        expect(price.amount).to eq(price.price)
+      end
+    end
+  end
+
   describe 'validations' do
     let(:variant) { stub_model Spree::Variant }
     subject { Spree::Price.new variant: variant, amount: amount }
@@ -22,20 +50,20 @@ describe Spree::Price, :type => :model do
       end
     end
 
-    context 'when the amount is greater than 999,999.99' do
-      let(:amount) { 1_000_000 }
+    context 'when the amount is greater than maximum amount' do
+      let(:amount) { Spree::Price::MAXIMUM_AMOUNT + 1 }
 
       it 'has 1 error_on' do
         expect(subject.error_on(:amount).size).to eq(1)
       end
       it 'populates errors' do
         subject.valid?
-        expect(subject.errors.messages[:amount].first).to eq 'must be less than or equal to 999999.99'
+        expect(subject.errors.messages[:amount].first).to eq "must be less than or equal to #{Spree::Price::MAXIMUM_AMOUNT}"
       end
     end
 
-    context 'when the amount is between 0 and 999,999.99' do
-      let(:amount) { 100 }
+    context 'when the amount is between 0 and the maximum amount' do
+      let(:amount) { Spree::Price::MAXIMUM_AMOUNT }
       it { is_expected.to be_valid }
     end
   end

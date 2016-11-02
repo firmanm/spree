@@ -1,10 +1,9 @@
-<% success = flash.discard(:success)
-if success %>
-  show_flash('success', "<%= j success %>")
+<% if success = flash.discard(:success) %>
+  show_flash('success', "<%= j success %>");
 <% end %>
 
 <% if error = flash.discard(:error) %>
-show_flash('warning', "<%= j error %>")
+  show_flash('error', "<%= j error %>");
 <% end %>
 
-<%= render :partial => '/spree/admin/shared/update_order_state' if @order %>
+<%= render partial: '/spree/admin/shared/update_order_state' if @order %>

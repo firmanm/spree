@@ -1,18 +1,23 @@
 $.fn.userAutocomplete = function () {
   'use strict';
 
+  function formatUser(user) {
+    return Select2.util.escapeMarkup(user.email);
+  }
+
   this.select2({
     minimumInputLength: 1,
     multiple: true,
     initSelection: function (element, callback) {
-      $.get(Spree.routes.user_search, {
-        ids: element.val()
+      $.get(Spree.routes.users_api, {
+        ids: element.val(),
+        token: Spree.api_key
       }, function (data) {
-        callback(data);
+        callback(data.users);
       });
     },
     ajax: {
-      url: Spree.routes.user_search,
+      url: Spree.routes.users_api,
       datatype: 'json',
       data: function (term) {
         return {
@@ -22,16 +27,12 @@ $.fn.userAutocomplete = function () {
       },
       results: function (data) {
         return {
-          results: data
+          results: data.users
         };
       }
     },
-    formatResult: function (user) {
-      return user.email;
-    },
-    formatSelection: function (user) {
-      return user.email;
-    }
+    formatResult: formatUser,
+    formatSelection: formatUser
   });
 };
 

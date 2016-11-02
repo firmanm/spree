@@ -10,7 +10,7 @@ module Spree
 
           layout :get_layout
 
-          before_filter :set_user_language
+          before_action :set_user_language
 
           protected
 
@@ -42,8 +42,8 @@ module Spree
 
           def render_404(exception = nil)
             respond_to do |type|
-              type.html { render :status => :not_found, :file    => "#{::Rails.root}/public/404", :formats => [:html], :layout => nil}
-              type.all  { render :status => :not_found, :nothing => true }
+              type.html { render status: :not_found, file: "#{::Rails.root}/public/404", formats: [:html], layout: nil}
+              type.all  { head :not_found }
             end
           end
 
@@ -51,9 +51,9 @@ module Spree
 
           def set_user_language
             locale = session[:locale]
-            locale ||= config_locale if respond_to?(:config_locale, true)
-            locale ||= Rails.application.config.i18n.default_locale
-            locale ||= I18n.default_locale unless I18n.available_locales.map(&:to_s).include?(locale)
+            locale = config_locale if respond_to?(:config_locale, true) && locale.blank?
+            locale = Rails.application.config.i18n.default_locale if locale.blank?
+            locale = I18n.default_locale unless I18n.available_locales.map(&:to_s).include?(locale.to_s)
             I18n.locale = locale
           end
 

@@ -6,6 +6,67 @@ describe Spree::LineItem, type: :model do
 
   before { create(:store) }
 
+  describe 'Validations' do
+    it { expect(line_item).to validate_numericality_of(:quantity).only_integer.with_message(Spree.t('validation.must_be_int')) }
+    it { expect(line_item).to validate_presence_of(:order) }
+
+    describe 'ensure_proper_currency' do
+      context 'order is present' do
+        context "when line_item's currency matches with order's" do
+          it { expect(line_item).to be_valid }
+        end
+
+        context "when line_item's currency does not matches with order's" do
+          before do
+            line_item.currency = "Invalid Currency"
+          end
+
+          it { expect(line_item).not_to be_valid }
+        end
+      end
+    end
+  end
+
+  describe '#ensure_valid_quantity' do
+    context 'quantity.nil?' do
+      before do
+        line_item.quantity = nil
+        line_item.valid?
+      end
+
+      it { expect(line_item.quantity).to be_zero }
+    end
+
+    context 'quantity < 0' do
+      before do
+        line_item.quantity = -1
+        line_item.valid?
+      end
+
+      it { expect(line_item.quantity).to be_zero }
+    end
+
+    context 'quantity = 0' do
+      before do
+        line_item.quantity = 0
+        line_item.valid?
+      end
+
+      it { expect(line_item.quantity).to be_zero }
+    end
+
+    context 'quantity > 0' do
+      let(:original_quantity) { 1 }
+
+      before do
+        line_item.quantity = original_quantity
+        line_item.valid?
+      end
+
+      it { expect(line_item.quantity).to eq(original_quantity) }
+    end
+  end
+
   context '#save' do
     it 'touches the order' do
       expect(line_item.order).to receive(:touch)
@@ -26,9 +87,9 @@ describe Spree::LineItem, type: :model do
   end
 
   context "#destroy" do
+    let!(:line_item) { order.line_items.first }
     it "returns inventory when a line item is destroyed" do
-      expect_any_instance_of(Spree::OrderInventory).to receive(:verify)
-      line_item.destroy
+      is_expected.to callback(:verify_order_inventory).before(:destroy)
     end
 
     it "deletes inventory units" do
@@ -274,9 +335,11 @@ describe Spree::LineItem, type: :model do
   end
 
   describe "precision of pre_tax_amount" do
-    let!(:line_item) { create :line_item, pre_tax_amount: 4.2051 }
+    let(:line_item) { create :line_item, pre_tax_amount: 4.2051 }
 
     it "keeps four digits of precision even when reloading" do
+      # prevent it from updating pre_tax_amount
+      allow_any_instance_of(Spree::LineItem).to receive(:update_tax_charge)
       expect(line_item.reload.pre_tax_amount).to eq(4.2051)
     end
   end

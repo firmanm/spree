@@ -1,14 +1,14 @@
 require 'spec_helper'
 require 'benchmark'
 
-describe Spree::Shipment, :type => :model do
+describe Spree::Shipment, type: :model do
   let(:order) { mock_model Spree::Order, backordered?: false,
                                          canceled?: false,
                                          can_ship?: true,
                                          currency: 'USD',
                                          number: 'S12345',
                                          paid?: false,
-                                         touch: true }
+                                         touch_later: false }
   let(:shipping_method) { create(:shipping_method, name: "UPS") }
   let(:shipment) do
     shipment = Spree::Shipment.new(cost: 1, state: 'pending', stock_location: create(:stock_location))
@@ -31,9 +31,11 @@ describe Spree::Shipment, :type => :model do
   end
 
   describe "precision of pre_tax_amount" do
-    let!(:line_item) { create :line_item, pre_tax_amount: 4.2051 }
+    let(:line_item) { create :line_item, pre_tax_amount: 4.2051 }
 
     it "keeps four digits of precision even when reloading" do
+      # prevent it from updating pre_tax_amount
+      allow_any_instance_of(Spree::LineItem).to receive(:update_tax_charge)
       expect(line_item.reload.pre_tax_amount).to eq(4.2051)
     end
   end
@@ -41,7 +43,7 @@ describe Spree::Shipment, :type => :model do
   # Regression test for #4063
   context "number generation" do
     before do
-      allow(order).to receive :update!
+      allow(order).to receive :update_with_updater!
     end
 
     it "generates a number containing a letter + 11 numbers" do
@@ -228,7 +230,7 @@ describe Spree::Shipment, :type => :model do
       end
 
       it "can't get rates without a shipping address" do
-        shipment.order(ship_address: nil)
+        shipment.order.ship_address = nil
         expect(shipment.refresh_rates).to eq([])
       end
 
@@ -394,7 +396,7 @@ describe Spree::Shipment, :type => :model do
 
   context "#cancel" do
     it 'cancels the shipment' do
-      allow(shipment.order).to receive(:update!)
+      allow(shipment.order).to receive(:update_with_updater!)
 
       shipment.state = 'pending'
       expect(shipment).to receive(:after_cancel)
@@ -440,7 +442,7 @@ describe Spree::Shipment, :type => :model do
 
   context "#resume" do
     it 'transitions state to ready if the order is ready' do
-      allow(shipment.order).to receive(:update!)
+      allow(shipment.order).to receive(:update_with_updater!)
 
       shipment.state = 'canceled'
       expect(shipment).to receive(:determine_state).and_return('ready')
@@ -450,7 +452,7 @@ describe Spree::Shipment, :type => :model do
     end
 
     it 'transitions state to pending if the order is not ready' do
-      allow(shipment.order).to receive(:update!)
+      allow(shipment.order).to receive(:update_with_updater!)
 
       shipment.state = 'canceled'
       expect(shipment).to receive(:determine_state).and_return('pending')
@@ -473,7 +475,7 @@ describe Spree::Shipment, :type => :model do
       let(:shipment_with_inventory_units) { create(:shipment, order: create(:order_with_line_items), state: 'canceled') }
       let(:subject) { shipment_with_inventory_units.ship! }
       before do
-        allow(order).to receive(:update!)
+        allow(order).to receive(:update_with_updater!)
         allow(shipment_with_inventory_units).to receive_messages(require_inventory: false, update_order: true)
       end
 
@@ -489,7 +491,7 @@ describe Spree::Shipment, :type => :model do
     ['ready', 'canceled'].each do |state|
       context "from #{state}" do
         before do
-          allow(order).to receive(:update!)
+          allow(order).to receive(:update_with_updater!)
           allow(shipment).to receive_messages(require_inventory: false, update_order: true, state: state)
         end
 
@@ -725,7 +727,7 @@ describe Spree::Shipment, :type => :model do
   context "state changes" do
     before do
       # Must be stubbed so transition can succeed
-      allow(order).to receive_messages :paid? => true
+      allow(order).to receive_messages paid?: true
     end
 
     it "are logged to the database" do

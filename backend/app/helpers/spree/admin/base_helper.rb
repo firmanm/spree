@@ -3,12 +3,15 @@ module Spree
     module BaseHelper
       def flash_alert flash
         if flash.present?
+          close_button = button_tag(class: 'close', 'data-dismiss' => 'alert', 'aria-label' => Spree.t(:close)) do
+            content_tag('span', '&times;'.html_safe, 'aria-hidden' => true)
+          end
           message = flash[:error] || flash[:notice] || flash[:success]
           flash_class = "danger" if flash[:error]
           flash_class = "info" if flash[:notice]
           flash_class = "success" if flash[:success]
-          flash_div = content_tag(:div, message, class: "alert alert-#{flash_class} alert-auto-disappear")
-          content_tag(:div, flash_div, class: 'col-md-12')          
+          flash_div = content_tag(:div, (close_button + message), class: "alert alert-#{flash_class} alert-auto-disappear")
+          content_tag(:div, flash_div, class: 'col-md-12')
         end
       end
 
@@ -26,7 +29,7 @@ module Spree
         obj = object.respond_to?(:errors) ? object : instance_variable_get("@#{object}")
 
         if obj && obj.errors[method].present?
-          errors = obj.errors[method].map { |err| h(err) }.join('<br />').html_safe
+          errors = safe_join(obj.errors[method], '<br />'.html_safe)
           content_tag(:span, errors, class: 'formError')
         else
           ''
@@ -117,12 +120,13 @@ module Spree
 
       def preference_fields(object, form)
         return unless object.respond_to?(:preferences)
-        object.preferences.keys.map{ |key|
-        if object.has_preference?(key)
-          form.label("preferred_#{key}", Spree.t(key) + ": ") +
-            preference_field_for(form, "preferred_#{key}", type: object.preference_type(key))
-        end
-        }.join("<br />").html_safe
+        fields = object.preferences.keys.map { |key|
+          if object.has_preference?(key)
+            form.label("preferred_#{key}", Spree.t(key) + ": ") +
+              preference_field_for(form, "preferred_#{key}", type: object.preference_type(key))
+          end
+        }
+        safe_join(fields, '<br />'.html_safe)
       end
 
       # renders hidden field and link to remove record using nested_attributes
@@ -140,10 +144,9 @@ module Spree
         resource_class.model_name.human(count: I18N_PLURAL_MANY_COUNT)
       end
 
-      private
-        def attribute_name_for(field_name)
-          field_name.gsub(' ', '_').downcase
-        end
+      def order_time(time)
+        [I18n.l(time.to_date), time.strftime("%l:%M %p").strip].join(' ')
+      end
     end
   end
 end
