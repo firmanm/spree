@@ -2,13 +2,12 @@ module Spree
   class StockTransfer < Spree::Base
     include Spree::Core::NumberGenerator.new(prefix: 'T')
 
-    extend FriendlyId
-    friendly_id :number, slug_column: :number, use: :slugged
-
     has_many :stock_movements, as: :originator
 
-    belongs_to :source_location, class_name: 'StockLocation'
+    belongs_to :source_location, class_name: 'StockLocation', optional: true
     belongs_to :destination_location, class_name: 'StockLocation'
+
+    validates :number, uniqueness: true
 
     self.whitelisted_ransackable_attributes = %w[reference source_location_id destination_location_id number]
 
@@ -32,11 +31,12 @@ module Spree
 
           self.source_location = source_location
           self.destination_location = destination_location
-          self.save!
+          save!
         end
       end
     end
 
+    # receive inventory from external vendor
     def receive(destination_location, variants)
       transfer(nil, destination_location, variants)
     end

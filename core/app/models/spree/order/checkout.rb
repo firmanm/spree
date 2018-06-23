@@ -15,12 +15,9 @@ module Spree
           self.removed_transitions ||= []
 
           def self.checkout_flow(&block)
-            if block_given?
-              @checkout_flow = block
-              define_state_machine!
-            else
-              @checkout_flow
-            end
+            return @checkout_flow unless block_given?
+            @checkout_flow = block
+            define_state_machine!
           end
 
           def self.define_state_machine!
@@ -46,7 +43,6 @@ module Spree
 
               # Persist the state on the order
               after_transition do |order, transition|
-                order.state = order.state
                 order.state_changes.create(
                   previous_state: transition.from,
                   next_state: transition.to,
@@ -62,7 +58,7 @@ module Spree
 
               event :return do
                 transition to: :returned,
-                           from: [:complete, :awaiting_return, :canceled, :resumed],
+                           from: [:complete, :awaiting_return, :canceled, :returned, :resumed],
                            if: :all_inventory_units_returned?
               end
 
@@ -104,6 +100,7 @@ module Spree
                 before_transition to: :delivery, do: :create_proposed_shipments
                 before_transition to: :delivery, do: :ensure_available_shipping_rates
                 before_transition to: :delivery, do: :set_shipments_cost
+                before_transition to: :delivery, do: :create_shipment_tax_charge!
                 before_transition from: :delivery, do: :apply_free_shipping_promotions
               end
 
@@ -125,14 +122,9 @@ module Spree
 
           def self.go_to_state(name, options = {})
             self.checkout_steps[name] = options
-            previous_states.each do |state|
-              add_transition({ from: state, to: name }.merge(options))
-            end
-            if options[:if]
-              previous_states << name
-            else
-              self.previous_states = [name]
-            end
+            self.previous_states.each { |state| add_transition({ from: state, to: name }.merge(options)) }
+            return self.previous_states << name if options[:if]
+            self.previous_states = [name]
           end
 
           def self.insert_checkout_step(name, options = {})
@@ -193,7 +185,7 @@ module Spree
               checkout_steps << step
             end).map(&:to_s)
             # Ensure there is always a complete step
-            steps << "complete" unless steps.include?("complete")
+            steps << 'complete' unless steps.include?('complete')
             steps
           end
 
@@ -226,12 +218,16 @@ module Spree
               # rails would slice parameters containg ruby objects, apparently
               existing_card_id = @updating_params[:order] ? @updating_params[:order].delete(:existing_card) : nil
 
-              attributes = @updating_params[:order] ? @updating_params[:order].permit(permitted_params).delete_if { |_k, v| v.nil? } : {}
+              attributes = if @updating_params[:order]
+                             @updating_params[:order].permit(permitted_params).delete_if { |_k, v| v.nil? }
+                           else
+                             {}
+                           end
 
               if existing_card_id.present?
                 credit_card = CreditCard.find existing_card_id
                 if credit_card.user_id != user_id || credit_card.user_id.blank?
-                  raise Core::GatewayError.new Spree.t(:invalid_credit_card)
+                  raise Core::GatewayError, Spree.t(:invalid_credit_card)
                 end
 
                 credit_card.verification_value = params[:cvc_confirm] if params[:cvc_confirm].present?
@@ -258,39 +254,34 @@ module Spree
               clone_billing
               # Skip setting ship address if order doesn't have a delivery checkout step
               # to avoid triggering validations on shipping address
-              clone_shipping if checkout_steps.include?("delivery")
+              clone_shipping if checkout_steps.include?('delivery')
             end
           end
 
           def clone_billing
-            if !bill_address_id && user.bill_address.try(:valid?)
-              self.bill_address = user.bill_address.try(:clone)
-            end
+            return unless !bill_address_id && user.bill_address.try(:valid?)
+            self.bill_address = user.bill_address.try(:clone)
           end
 
           def clone_shipping
-            if !ship_address_id && user.ship_address.try(:valid?)
-              self.ship_address = user.ship_address.try(:clone)
-            end
+            return unless !ship_address_id && user.ship_address.try(:valid?)
+            self.ship_address = user.ship_address.try(:clone)
           end
 
           def persist_user_address!
-            if !temporary_address && user && user.respond_to?(:persist_order_address) && bill_address_id
-              user.persist_order_address(self)
-            end
+            return unless !temporary_address && user && user.respond_to?(:persist_order_address) && bill_address_id
+            user.persist_order_address(self)
           end
 
           def persist_user_credit_card
-            if !temporary_credit_card && user_id && valid_credit_cards.present?
-              valid_credit_cards.first.update(user_id: user_id, default: true)
-            end
+            return unless !temporary_credit_card && user_id && valid_credit_cards.present?
+            valid_credit_cards.first.update(user_id: user_id, default: true)
           end
 
           def assign_default_credit_card
-            if payments.from_credit_card.size == 0 && user_has_valid_default_card? && payment_required?
-              cc = user.default_credit_card
-              payments.create!(payment_method_id: cc.payment_method_id, source: cc, amount: total)
-            end
+            return unless payments.from_credit_card.size.empty? && user_has_valid_default_card? && payment_required?
+            cc = user.default_credit_card
+            payments.create!(payment_method_id: cc.payment_method_id, source: cc, amount: total)
           end
 
           def user_has_valid_default_card?
@@ -316,7 +307,7 @@ module Spree
             if @updating_params[:payment_source].present?
               source_params = @updating_params.
                               delete(:payment_source)[@updating_params[:order][:payments_attributes].
-                                                      first[:payment_method_id].to_s]
+                              first[:payment_method_id].to_s]
 
               if source_params
                 @updating_params[:order][:payments_attributes].first[:source_attributes] = source_params

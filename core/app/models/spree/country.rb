@@ -14,11 +14,12 @@ module Spree
 
     has_many :zones, through: :zone_members, class_name: 'Spree::Zone'
 
-    validates :name, :iso_name, presence: true, uniqueness: { case_sensitive: false, allow_blank: true }
+    validates :name, :iso_name, presence: true, uniqueness: { case_sensitive: false }
 
     def self.default
       country_id = Spree::Config[:default_country_id]
-      country_id.present? ? find(country_id) : find_by!(iso: 'US')
+      default = find_by(id: country_id) if country_id.present?
+      default || find_by(iso: 'US') || first
     end
 
     def <=>(other)

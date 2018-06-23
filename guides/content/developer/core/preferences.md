@@ -39,7 +39,7 @@ Both use cases are handled by Spree Preferences. They are easy to define, provid
 
 ## General Settings
 
-Spree comes with many application-wide preferences. They are defined in `core/app/models/spree/app_configuration.rb` and made available to your code through `Spree::Config`, e.g., `Spree::Config.site_name`.
+Spree comes with many application-wide preferences. They are defined in `core/app/models/spree/app_configuration.rb` and made available to your code through `Spree::Config`, e.g., `Spree::Config.logo`.
 
 A limited set of the general settings are available in the admin interface of your store (`/admin/general_settings`).
 
@@ -245,8 +245,8 @@ During the Spree installation process, an initializer file is created within you
 ```ruby
 Spree.config do |config|
   # Example:
-  # Uncomment to override the default site name.
-  # config.site_name = "Spree Demo Site"
+  # Uncomment to override the default logo location.
+  # config.logo = 'logo/my_store.png'
 end
 ```
 
@@ -256,7 +256,7 @@ For example if you would like to change the logo location and if you want to tax
 
 ```ruby
 Spree.config do |config|
-  config.admin_interface_logo = 'logo/my_store.png'
+  config.logo = 'logo/my_store.png'
   config.tax_using_ship_address = true
 end
 ```
@@ -325,7 +325,7 @@ The path to the logo to display on the admin interface. Can be different from `S
 
 `admin_products_per_page`
 
-How many products to display on the products listing in the admin interface. Defaults to 10.
+How many products to display on the products listing in the admin interface. Defaults to 30.
 
 `allow_checkout_on_gateway_error`
 
@@ -402,9 +402,9 @@ The logo to display on your frontend. Defaults to `logo/spree_50.png`.
 
 The number of levels to descend when viewing a taxon menu. Defaults to `1`.
 
-`orders_per_page`
+`admin_orders_per_page`
 
-The number of orders to display on the orders listing in the admin backend. Defaults to `15`.
+The number of orders to display on the orders listing in the admin backend. Defaults to `30`.
 
 `prices_inc_tax`
 

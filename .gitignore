@@ -1,6 +1,7 @@
 \#*
 **/*.db
 **/*.log
+**/*.byebug_history
 *~
 .#*
 .DS_Store
@@ -9,7 +10,7 @@
 .idea
 .loadpath
 .project
-.ruby-version
+.vscode
 bin/*
 public/dispatch.cgi
 public/dispatch.fcgi

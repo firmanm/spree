@@ -2,13 +2,13 @@ module Spree
   class Order < Spree::Base
     module StoreCredit
       def add_store_credit_payments
-        payments.store_credits.where(state: 'checkout').map(&:invalidate!)
+        payments.store_credits.where(state: :checkout).map(&:invalidate!)
 
         remaining_total = outstanding_balance
 
         if user && user.store_credits.any?
           payment_method = Spree::PaymentMethod::StoreCredit.available.first
-          raise "Store credit payment method could not be found" unless payment_method
+          raise 'Store credit payment method could not be found' unless payment_method
 
           user.store_credits.order_by_priority.each do |credit|
             break if remaining_total.zero?
@@ -18,14 +18,19 @@ module Spree
             create_store_credit_payment(payment_method, credit, amount_to_take)
             remaining_total -= amount_to_take
           end
+          payments.store_credits.checkout
         end
+      end
+
+      def remove_store_credit_payments
+        payments.checkout.store_credits.map(&:invalidate!) unless completed?
       end
 
       def covered_by_store_credit?
         return false unless user
         user.total_available_store_credit >= total
       end
-      alias_method :covered_by_store_credit, :covered_by_store_credit?
+      alias covered_by_store_credit covered_by_store_credit?
 
       def total_available_store_credit
         return 0.0 unless user

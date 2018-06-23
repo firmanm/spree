@@ -8,11 +8,7 @@ class Project
   NODE_TOTAL = Integer(ENV.fetch('CIRCLE_NODE_TOTAL', 1))
   NODE_INDEX = Integer(ENV.fetch('CIRCLE_NODE_INDEX', 0))
 
-  ROOT          = Pathname.pwd.freeze
-  VENDOR_BUNDLE = ROOT.join('vendor', 'bundle').freeze
-
-  BUNDLER_JOBS    = 4
-  BUNDLER_RETRIES = 3
+  ROOT       = Pathname.pwd.freeze
 
   DEFAULT_MODE = 'test'.freeze
 
@@ -31,7 +27,7 @@ class Project
   #   otherwise
   def install
     chdir do
-      bundle_check or bundle_install or fail 'Cannot finish gem installation'
+      bundle_check || bundle_install || raise('Cannot finish gem installation')
     end
     self
   end
@@ -53,7 +49,7 @@ class Project
   #
   # @return [Boolean]
   def bundle_check
-    system(%W[bundle check --path=#{VENDOR_BUNDLE}])
+    system(%w[bundle check])
   end
 
   # Install the current bundle
@@ -61,20 +57,14 @@ class Project
   # @return [Boolean]
   #   the success of the installation
   def bundle_install
-    system(%W[
-      bundle
-      install
-      --path=#{VENDOR_BUNDLE}
-      --jobs=#{BUNDLER_JOBS}
-      --retry=#{BUNDLER_RETRIES}
-    ])
+    system(%w[bundle install])
   end
 
   # Setup the test app
   #
   # @return [undefined]
   def setup_test_app
-    system(%w[bundle exec rake test_app]) or fail 'Failed to setup the test app'
+    system(%w[bundle exec rake test_app]) || raise('Failed to setup the test app')
   end
 
   # Run tests for subproject
@@ -82,7 +72,17 @@ class Project
   # @return [Boolean]
   #   the success of the tests
   def run_tests
-    system(%w[bundle exec rspec] + rspec_arguments)
+    # HACK: supporting test coverage as for Paperclip, as for ActiveStorage
+    # remove after, Paperclip going to be deprecated
+    # system(%w[bundle exec rspec] + rspec_arguments)
+    if name == 'core'
+      paperclip_test = system(%w[bundle exec rspec] + rspec_arguments)
+      ENV['SPREE_USE_PAPERCLIP'] = nil
+      active_storage_test = system(%w[bundle exec rspec] + rspec_arguments)
+      paperclip_test && active_storage_test
+    else
+      system(%w[bundle exec rspec] + rspec_arguments)
+    end
   end
 
   def rspec_arguments
@@ -175,7 +175,7 @@ class Project
   # @return [Boolean]
   #   the success of the CLI run
   def self.run_cli(arguments)
-    fail ArgumentError if arguments.length > 1
+    raise ArgumentError if arguments.length > 1
     mode = arguments.fetch(0, DEFAULT_MODE)
 
     case mode
@@ -185,7 +185,7 @@ class Project
     when 'test'
       test
     else
-      fail "Unknown mode: #{mode.inspect}"
+      raise "Unknown mode: #{mode.inspect}"
     end
   end
 end # Project

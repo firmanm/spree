@@ -9,7 +9,7 @@ To create a new product for your store, go into the Admin Interface, click the "
 
 ![New Product Entry Form](/images/user/products/new_product_entry_form.jpg)
 
-The two mandatory fields ("Name" and "Master Price") are denoted with an asterisk (&#42;) next to the label. You can leave SKU blank. If you don't add a value for "Available On" the product will not be shown in your store.
+The three mandatory fields ("Name", "Master Price", and "Shipping Categories") are denoted with an asterisk (&#42;) next to the label. You can leave SKU blank. If you don't add a value for "Available On" the product will not be shown in your store.
 
 ***
 [Prototypes](product_prototypes) are a more complex topic, and are covered in their own guide.
@@ -111,9 +111,9 @@ You can read much more in-depth information about this feature in the [Product P
 
 ## Stock Management
 
-As of version 2.0 of Spree, you now have much more granular control over how inventory is tracked through your store. You will learn more about stock locations in the [Stock Locations Guide](stock_locations), but for now it's enough to understand that you enter the number of each product variant that you have at each of your individual stock locations.
+As of version 2.0 of Spree, you now have much more granular control over how inventory is tracked through your store. You will learn more about stock locations in the [Stock Locations Guide](configuring_inventory), but for now it's enough to understand that you enter the number of each product variant that you have at each of your individual stock locations.
 
-Let's assume that you have two stock locations - your main New York warehouse and your satellite Detroit warehouse. Refer to the instructions on creating stock locations in the [Stock Locations Guide](stock_locations#create-a-new-stock-location) to add your warehouses.
+Let's assume that you have two stock locations - your main New York warehouse and your satellite Detroit warehouse. Refer to the instructions on creating stock locations in the [Stock Locations Guide](configuring_inventory#create-a-new-stock-location) to add your warehouses.
 
 Now, go back to the Tumblers product page, and click the "Stock Management" link.
 

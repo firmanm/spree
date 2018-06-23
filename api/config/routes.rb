@@ -3,6 +3,9 @@ Spree::Core::Engine.add_routes do
     namespace :v1 do
       resources :promotions, only: [:show]
 
+      resources :customer_returns, only: [:index]
+      resources :reimbursements, only: [:index]
+
       resources :products do
         resources :images
         resources :variants
@@ -58,9 +61,11 @@ Spree::Core::Engine.add_routes do
       resources :option_values, only: :index
 
       get '/orders/mine', to: 'orders#mine', as: 'my_orders'
-      get "/orders/current", to: "orders#current", as: "current_order"
+      get '/orders/current', to: 'orders#current', as: 'current_order'
 
-      resources :orders, concerns: :order_routes
+      resources :orders, concerns: :order_routes do
+        put :remove_coupon_code, on: :member
+      end
 
       resources :zones
       resources :countries, only: [:index, :show] do
@@ -117,10 +122,34 @@ Spree::Core::Engine.add_routes do
       get '/taxons/products', to: 'taxons#products', as: :taxon_products
     end
 
-    match 'v:api/*path', to: redirect("/api/v1/%{path}"), via: [:get, :post, :put, :patch, :delete]
+    namespace :v2 do
+      if Rails.env.development? || ENV['EXPOSE_SWAGGER']
+        get 'storefront.yml', to: 'swagger#storefront', as: 'swagger_storefront', format: 'yml'
+      end
 
-    match '*path', to: redirect{ |params, request|
-      "/api/v1/#{params[:path]}?#{request.query_string}"
+      namespace :storefront do
+        resource :cart, controller: :cart, only: %i[show create] do
+          post :add_item
+          post :empty
+          delete :remove_line_item
+        end
+      end
+    end
+
+    spree_path = Rails.application.routes.url_helpers.try(:spree_path, trailing_slash: true) || '/'
+
+    match 'v:api/*path', to: redirect { |params, request|
+      format = ".#{params[:format]}" unless params[:format].blank?
+      query  = "?#{request.query_string}" unless request.query_string.blank?
+
+      "#{spree_path}api/v1/#{params[:path]}#{format}#{query}"
+    }, via: [:get, :post, :put, :patch, :delete]
+
+    match '*path', to: redirect { |params, request|
+      format = ".#{params[:format]}" unless params[:format].blank?
+      query  = "?#{request.query_string}" unless request.query_string.blank?
+
+      "#{spree_path}api/v1/#{params[:path]}#{format}#{query}"
     }, via: [:get, :post, :put, :patch, :delete]
   end
 end
