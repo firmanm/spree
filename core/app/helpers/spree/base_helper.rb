@@ -1,12 +1,12 @@
 module Spree
   module BaseHelper
     def available_countries
-      checkout_zone = Zone.find_by(name: Spree::Config[:checkout_zone])
+      checkout_zone = Spree::Zone.find_by(name: Spree::Config[:checkout_zone])
 
       countries = if checkout_zone && checkout_zone.kind == 'country'
                     checkout_zone.country_list
                   else
-                    Country.all
+                    Spree::Country.all
                   end
 
       countries.collect do |country|
@@ -33,7 +33,11 @@ module Spree
     end
 
     def logo(image_path = Spree::Config[:logo])
-      link_to image_tag(image_path), spree.respond_to?(:root_path) ? spree.root_path : main_app.root_path
+      path = spree.respond_to?(:root_path) ? spree.root_path : main_app.root_path
+
+      link_to path, 'aria-label': Spree.t('go_to_homepage') do
+        image_tag image_path, alt: current_store.name
+      end
     end
 
     def meta_data
@@ -58,7 +62,7 @@ module Spree
 
     def meta_data_tags
       meta_data.map do |name, content|
-        tag('meta', name: name, content: content)
+        tag('meta', name: name, content: content) unless name.nil? || content.nil?
       end.join("\n")
     end
 
@@ -75,13 +79,8 @@ module Spree
       [I18n.l(time.to_date, format: :long), time.strftime('%l:%M %p')].join(' ')
     end
 
-    def seo_url(taxon)
-      spree.nested_taxons_path(taxon.permalink)
-    end
-
-    # human readable list of variant options
-    def variant_options(v, _options = {})
-      v.options_text
+    def seo_url(taxon, options = nil)
+      spree.nested_taxons_path(taxon.permalink, options)
     end
 
     def frontend_available?
@@ -91,7 +90,7 @@ module Spree
     private
 
     def create_product_image_tag(image, product, options, style)
-      options.reverse_merge! alt: image.alt.blank? ? product.name : image.alt
+      options[:alt] = image.alt.blank? ? product.name : image.alt
       image_tag main_app.url_for(image.url(style)), options
     end
 
@@ -102,12 +101,10 @@ module Spree
         if product.images.empty?
           if !product.is_a?(Spree::Variant) && !product.variant_images.empty?
             create_product_image_tag(product.variant_images.first, product, options, style)
+          elsif product.is_a?(Spree::Variant) && !product.product.variant_images.empty?
+            create_product_image_tag(product.product.variant_images.first, product, options, style)
           else
-            if product.is_a?(Variant) && !product.product.variant_images.empty?
-              create_product_image_tag(product.product.variant_images.first, product, options, style)
-            else
-              image_tag "noimage/#{style}.png", options
-            end
+            image_tag "noimage/#{style}.png", options
           end
         else
           create_product_image_tag(product.images.first, product, options, style)
